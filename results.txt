@@ -1,0 +1,5 @@
+Results 108 exam series questions
+success rate for
+qwen2.5-3b-instruct: 0.42592592592592593
+qwen2.5-7b-instruct: 0.46296296296296297
+qwen-coder-32B-instruct: 0.37962962962962965

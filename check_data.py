@@ -46,7 +46,11 @@ index = 0
 max_index = df_trend.shape[0]
 print("max_index: ", max_index, " index: ", index)
 
-for index in range(30):
+nb_success = 0
+
+nb_questions = len(df_trend)
+
+for index in range(nb_questions):
     print("index: ", index)
 
 
@@ -85,5 +89,22 @@ for index in range(30):
         print(f"Error: {response.status_code}, {response.text}")
 
     print("Expected answer: ", expected_answer)
+    #convert expected answer to string
+    expected_answer = str(expected_answer)
+    #convert content to string
+    content = str(content)
+    #convert the expected answer to lower case if the type permits
+    expected_answer = expected_answer.lower()
+    # convert the content to lower case if the type permits
+    content = content.lower()
+    # check if the expected answer is in the content
+    if expected_answer in content:
+        print("Correct")
+        nb_success += 1
+    else:
+        print("Incorrect")
+
+success_rate = nb_success / nb_questions
+print("Success rate: ", success_rate)
 
 
