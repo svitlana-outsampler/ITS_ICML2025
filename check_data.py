@@ -11,13 +11,19 @@ df = pd.read_json(data)
 # select all entries with "subcategory": "Trend Recognition"
 df_trend = df[df['subcategory'] == 'Trend Recognition']
 # print df_trend
-print(df_trend)
+#print(df_trend)
+
+#print available columns
+print(df_trend.columns)
+# wait for the user to press enter
+input("Press Enter to continue...")
 
 # save it as json file
 df_trend.to_json('qa_dataset_trend.json', orient='records')
 
 import requests
 # send a prompt question to the llm at http://localhost:8000/
+# for a warming up
 url = "http://127.0.0.1:8080/v1/chat/completions"
 # Define the payload
 payload = {
@@ -33,25 +39,51 @@ if response.status_code == 200:
     print(response.json())
 else:
     print(f"Error: {response.status_code}, {response.text}")
-preprompt = "Here is a time series : \n"
-# add the time series of the first question to the prompt
-prompt = preprompt + ', '.join(map(str, df_trend.iloc[0]['ts']))
-prompt = prompt + "what is the general trend (increasing or decreasing) of the time series?\n"
 
-print(prompt)
 
-# define the new payload
+index = 0
 
-payload = {
-    "model": "llama",  # Adjust based on your model's name
-    "messages": [{"role": "user", "content": prompt}],
-    "temperature": 0.7
-}
-response = requests.post(url, json=payload)
-# Print the response
-if response.status_code == 200:
-    print(response.json())
-else:
-    print(f"Error: {response.status_code}, {response.text}")
+max_index = df_trend.shape[0]
+print("max_index: ", max_index, " index: ", index)
+
+for index in range(30):
+    print("index: ", index)
+
+
+    preprompt = "Here is a time series : \n"
+    # add the time series of the first question to the prompt
+    prompt = preprompt + ', '.join(map(str, df_trend.iloc[index]['ts']))
+    options = df_trend.iloc[index]['options']
+    # convert the options to a string
+    options = ', '.join(map(str, options))
+    question = df_trend.iloc[index]['question']
+    print("question: ", question, " options: ", options)
+    prompt = prompt + "\n" + question + "\npossible answers: " + options + "\n"
+    prompt = prompt + "Answer the question with one of the options.\n"
+
+    expected_answer = df_trend.iloc[index]['answer']
+
+    #print(prompt)
+    #input("Press Enter to continue...")
+
+    # define the new payload
+    # limiting the number of tokens to 20
+    payload = {
+        "model": "llama",  # Adjust based on your model's name
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7,
+        "max_tokens": 20
+    }
+    response = requests.post(url, json=payload)
+    # Print the response, which is extracted from the 'content' in the payload
+    content = response.json()['choices'][0]['message']['content']
+    stop_reason = response.json()['choices'][0]['finish_reason']
+    if response.status_code == 200:
+        print("LLM answer: ", content)
+        #print(stop_reason)
+    else:
+        print(f"Error: {response.status_code}, {response.text}")
+
+    print("Expected answer: ", expected_answer)
 
 
