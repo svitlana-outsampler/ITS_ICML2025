@@ -63,7 +63,7 @@ for index in range(nb_questions):
     question = df_trend.iloc[index]['question']
     print("question: ", question, " options: ", options)
     prompt = prompt + "\n" + question + "\npossible answers: " + options + "\n"
-    prompt = prompt + "Answer the question with one of the options.\n"
+    prompt = prompt + "Answer shortly the question by giving only one of the options.\n"
 
     expected_answer = df_trend.iloc[index]['answer']
 
@@ -73,9 +73,7 @@ for index in range(nb_questions):
     # define the new payload
     # limiting the number of tokens to 20
     payload = {
-        "model": "llama",  # Adjust based on your model's name
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7,
         "max_tokens": 20
     }
     response = requests.post(url, json=payload)
