@@ -25,7 +25,8 @@ base64_image = encode_image(image_path)
 api_key = os.environ["MISTRAL_API_KEY"]
 
 # Specify model
-model = "pixtral-12b-2409"
+#model = "pixtral-12b-2409"
+model = "pixtral-large-latest"
 
 # Define the messages for the chat
 messages = [
@@ -34,7 +35,7 @@ messages = [
         "content": [
             {
                 "type": "text",
-                "text": "What's in this image?"
+                "text": "Describe the time series in three sentences. First sentence: describe increasing/decreasing/flat pattern. Second sentence: describe the overall trend and the noise. Third sentence: describe local and globe extrema."
             },
             {
                 "type": "image_url",
