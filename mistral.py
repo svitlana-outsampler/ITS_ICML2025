@@ -120,7 +120,7 @@ class Mistral:
     # generate a dataset of time series, images and description
     # the series, images and description are stored in the dataset directory
     # in the same time a json object data_json is created: it is a list of dictionnaries
-    # each dictionnary has three entries: "series", "image" and "description"
+    # each dictionnary has four entries: "question", "series", "image" and "description"
     # the series is a list of floats, the image is a string containing the path to the image
     # and the description is a string
     def dataset(self, n):
@@ -150,6 +150,7 @@ class Mistral:
             ts_list = ts.tolist()
 
             data_json.append({
+                "question": "Describe the time series in three sentences. First sentence: describe increasing/decreasing/flat pattern. Second sentence: describe the overall trend and the noise. Third sentence: describe local and globe extrema.",
                 "series": ts_list,
                 "image": os.path.join(directory, f"ou_process_{i}.png"),
                 "description": response["choices"][0]["message"]["content"]
