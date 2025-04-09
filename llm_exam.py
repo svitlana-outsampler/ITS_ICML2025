@@ -103,14 +103,17 @@ class LLMExam:
         
 
 bench = LLMExam()
-# index = 12
-# prompt, expected_answer = bench.get_question(index)
-# print(prompt)
-# print("Expected answer: ", expected_answer)
+index = 1
+prompt, expected_answer = bench.get_question(index)
+print(prompt)
+# save prompt to file question.txt
+with open("question2.txt", "w") as f:
+    f.write(prompt)
+print("Expected answer: ", expected_answer)
 
-# llm_answer = bench.get_llm_answer(prompt)
-# print("LLM answer: ",llm_answer)
+llm_answer = bench.get_llm_answer(prompt)
+print("LLM answer: ",llm_answer)
 
-success_rate = bench.benchmark()
+#success_rate = bench.benchmark()
 
-print("success rate: ", success_rate)
+#print("success rate: ", success_rate)
