@@ -52,12 +52,12 @@ class OUProcess:
 # a simple class for asking questions to a LLM about a given picture
 # the picture is encoded in base64 and sent to the LLM
 class Mistral:
-    def __init__(self):
+    def __init__(self, dryrun = True):
         self.api_key = os.environ.get("MISTRAL_API_KEY")
         self.api_url = "https://api.mistral.ai/v1/chat/completions"
         #self.model = "pixtral-large-latest"
         self.model = "pixtral-12b-2409"
-        self.dryrun = True # if True, do not send the request to the LLM
+        self.dryrun = dryrun # if True, do not send the request to the LLM
         print("Mistral initialized")
         #print(f"Mistral API key: {self.api_key}")
         print(f"Mistral API URL: {self.api_url}")
@@ -169,7 +169,7 @@ class Mistral:
 
 
 if __name__ == "__main__":
-    chat = Mistral()
+    chat = Mistral(dryrun = False)
     # response = chat.ask(
     #     "ou_process.png",
     #     "Describe the time series in three sentences. "
