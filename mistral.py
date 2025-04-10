@@ -18,7 +18,7 @@ class OUProcess:
         self.dt=0.01        # Time step
 
     def generate(self, imagename="ou_process.png", filename="ou_process.dat"):
-        print(self.dt)
+        #print(self.dt)
         N = int(self.T / self.dt)               # Number of time steps
         t = np.linspace(0, self.T, N)      # Time grid
         X = np.zeros(N)               # Array to store the process values
@@ -55,8 +55,13 @@ class Mistral:
     def __init__(self):
         self.api_key = os.environ.get("MISTRAL_API_KEY")
         self.api_url = "https://api.mistral.ai/v1/chat/completions"
-        self.model = "pixtral-large-latest"
-        self.dryrun = False # if True, do not send the request to the LLM
+        #self.model = "pixtral-large-latest"
+        self.model = "pixtral-12b-2409"
+        self.dryrun = True # if True, do not send the request to the LLM
+        print("Mistral initialized")
+        #print(f"Mistral API key: {self.api_key}")
+        print(f"Mistral API URL: {self.api_url}")
+        print(f"Mistral model: {self.model}")
     
     def encode_image(self, image_path):
         """Encode the image to base64."""
@@ -174,7 +179,7 @@ if __name__ == "__main__":
     # )
     # print(response)
 
-    ou = OUProcess()
-    ou.generate("toto.png", "toto.txt")
+    #ou = OUProcess()
+    #ou.generate("toto.png", "toto.txt")
 
     chat.dataset(3)
