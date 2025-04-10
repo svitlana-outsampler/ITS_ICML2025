@@ -136,6 +136,7 @@ class Mistral:
         data_json = []
 
         for i in range(n):
+            print(f"Generating time series {i+1}/{n}")
             ou = OUProcess()
             ts = ou.generate(
                 os.path.join(directory, f"ou_process_{i}.png"),
