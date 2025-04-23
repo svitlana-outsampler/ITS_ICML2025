@@ -16,7 +16,7 @@ def load_jsonl_dataset(path):
     return Dataset.from_list(lines)
 
 raw_dataset = load_jsonl_dataset(DATASET_PATH)
-split_dataset = raw_dataset.train_test_split(test_size=0.25)
+split_dataset = raw_dataset.train_test_split(test_size=0.10)
 dataset = DatasetDict({
     "train": split_dataset["train"],
     "test": split_dataset["test"]
@@ -131,7 +131,7 @@ training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
     per_device_train_batch_size=2,
     gradient_accumulation_steps=8,
-    num_train_epochs=10,
+    num_train_epochs=100,
     learning_rate=2e-4,
     fp16=True,
     logging_dir=f"{OUTPUT_DIR}/logs",   # <- Où les logs seront sauvegardés
