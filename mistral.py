@@ -172,7 +172,7 @@ class Mistral:
 
 
 if __name__ == "__main__":
-    chat = Mistral(dryrun = True)
+    chat = Mistral(dryrun = False)
     # response = chat.ask(
     #     "ou_process.png",
     #     "Describe the time series in three sentences. "
@@ -185,4 +185,4 @@ if __name__ == "__main__":
     #ou = OUProcess()
     #ou.generate("toto.png", "toto.txt")
 
-    chat.dataset(10)
+    chat.dataset(50)
