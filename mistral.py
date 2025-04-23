@@ -55,8 +55,8 @@ class Mistral:
     def __init__(self, dryrun = True):
         self.api_key = os.environ.get("MISTRAL_API_KEY")
         self.api_url = "https://api.mistral.ai/v1/chat/completions"
-        #self.model = "pixtral-large-latest"
-        self.model = "pixtral-12b-2409"
+        self.model = "pixtral-large-latest"
+        #self.model = "pixtral-12b-2409"
         self.dryrun = dryrun # if True, do not send the request to the LLM
         print("Mistral initialized")
         #print(f"Mistral API key: {self.api_key}")
@@ -183,4 +183,4 @@ if __name__ == "__main__":
     #ou = OUProcess()
     #ou.generate("toto.png", "toto.txt")
 
-    chat.dataset(3)
+    chat.dataset(10)
