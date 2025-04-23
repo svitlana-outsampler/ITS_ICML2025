@@ -15,9 +15,11 @@ class OUProcess:
         self.sigma=0.3      # Volatility: the intensity of the random fluctuations (Brownian motion component)
         self.x0=0.0         # Initial value of the process
         self.T=1.0          # Total time
-        self.dt=0.01        # Time step
 
     def generate(self, imagename="ou_process.png", filename="ou_process.dat"):
+        #print(self.dt)
+        N = 128
+        self.dt = self.T/N
         #print(self.dt)
         N = int(self.T / self.dt)               # Number of time steps
         t = np.linspace(0, self.T, N)      # Time grid
@@ -170,7 +172,7 @@ class Mistral:
 
 
 if __name__ == "__main__":
-    chat = Mistral(dryrun = False)
+    chat = Mistral(dryrun = True)
     # response = chat.ask(
     #     "ou_process.png",
     #     "Describe the time series in three sentences. "
