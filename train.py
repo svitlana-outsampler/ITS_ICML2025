@@ -27,26 +27,64 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
 tokenizer.pad_token = tokenizer.eos_token
 
 # === PREPROCESSING ===
+# def tokenize(example):
+#     prompt = example["input"]
+#     response = example["output"]
+#     full_prompt = f"{prompt}\n\n{response}"
+#     tokenized = tokenizer(full_prompt, truncation=True, padding="max_length", max_length=512)
+#     tokenized["labels"] = tokenized["input_ids"].copy()
+#     return tokenized
+
+
 def tokenize(example):
     prompt = example["input"]
     response = example["output"]
-    full_prompt = f"{prompt}\n\n{response}"
-    tokenized = tokenizer(full_prompt, truncation=True, padding="max_length", max_length=512)
-    tokenized["labels"] = tokenized["input_ids"].copy()
-    return tokenized
+
+    # Tokenise prompt et réponse séparément
+    prompt_ids = tokenizer(prompt, truncation=False)["input_ids"]
+    response_ids = tokenizer(response, truncation=True, max_length=256)["input_ids"]  # <= on garde réponse entière
+
+    # Calcul de l'espace disponible pour le prompt
+    max_total_len = 2048
+    max_prompt_len = max_total_len - len(response_ids)
+    print("Tokens réponse:", len(response_ids))
+    print("Tokens prompt:", len(prompt_ids))
+    print("Tokens max prompt:", max_prompt_len)
+    prompt_ids = prompt_ids[-max_prompt_len:]  # On coupe à droite si trop long
+
+    input_ids = prompt_ids + response_ids
+    attention_mask = [1] * len(input_ids)
+    
+    # Labels : on ignore les tokens du prompt
+    labels = [-100] * len(prompt_ids) + response_ids
+
+    # Padding si nécessaire
+    pad_len = max_total_len - len(input_ids)
+    if pad_len > 0:
+        input_ids += [tokenizer.pad_token_id] * pad_len
+        attention_mask += [0] * pad_len
+        labels += [-100] * pad_len
+
+    return {
+        "input_ids": input_ids,
+        "attention_mask": attention_mask,
+        "labels": labels
+    }
+
+
 
 tokenized_dataset = dataset.map(tokenize, remove_columns=dataset["train"].column_names)
-
-# === MODEL EN 8-BIT ===
-bnb_config = BitsAndBytesConfig(
-    load_in_8bit=True,
-    llm_int8_threshold=6.0,
-    llm_int8_skip_modules=None
-)
+ 
+# === MODEL EN 8-BIT ===   marche pas avec AMD ?
+# bnb_config = BitsAndBytesConfig(
+#     load_in_8bit=True,
+#     llm_int8_threshold=6.0,
+#     llm_int8_skip_modules=None
+# )
 
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME,
-    quantization_config=bnb_config,
+    #quantization_config=bnb_config,   # marche pas avec AMD ?
     device_map="auto",
     trust_remote_code=True
 )
@@ -98,7 +136,14 @@ def compute_semantic_similarity(model, tokenizer, dataset, output_file=None):
         inputs_tokenized = tokenizer(inp, return_tensors="pt").to(model.device)
         prompt_len = inputs_tokenized.input_ids.shape[1]
         with torch.no_grad():
-            output_ids = model.generate(**inputs_tokenized, max_new_tokens=128)
+            # output_ids = model.generate(**inputs_tokenized, max_new_tokens=128)
+            output_ids = model.generate(
+            **inputs_tokenized,
+            max_new_tokens=256,
+            #max_length=2048,  # pour éviter que ça tronque le prompt
+            do_sample=True,
+            temperature=0.7
+            )
         
         generated_only_ids = output_ids[0][prompt_len:]
         output_text = tokenizer.decode(generated_only_ids, skip_special_tokens=True)
@@ -131,14 +176,19 @@ training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
     per_device_train_batch_size=2,
     gradient_accumulation_steps=8,
-    num_train_epochs=100,
+    num_train_epochs=50,
     learning_rate=2e-4,
     fp16=True,
     logging_dir=f"{OUTPUT_DIR}/logs",   # <- Où les logs seront sauvegardés
     logging_steps=10, 
     save_strategy="epoch",
     #evaluation_strategy="epoch",
-    report_to="none"
+    report_to="none",
+    max_steps=1000,  # optionnel
+    #optim="paged_adamw_8bit",  # si tu veux économiser la mémoire
+    # **{
+    #     "max_length": 2048,  # ← utile si jamais tu utilises la génération dans l’éval
+    # }
 )
 
 trainer = Trainer(
@@ -147,7 +197,7 @@ trainer = Trainer(
     train_dataset=tokenized_dataset["train"],
     eval_dataset=tokenized_dataset["test"],
     tokenizer=tokenizer,
-    #label_names=["labels"]
+    # label_names=["labels"]
 )
 
 print("\nÉvaluation avant entraînement (similarité sémantique)...")
