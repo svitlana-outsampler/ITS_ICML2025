@@ -71,7 +71,7 @@ The computations are periodically saved, and could be stopped and restarted but 
 
 
 ## Testing the model
-At the end of the training, the model is tested against 10% of the dataset (that is not used for training). A semantic embedding is computed for the answers and the reference answers. The cosine similarity is then computed and the average is displayed.
+At the end of the training, the model is tested against 10% of the dataset (a part that is not used for training). A semantic embedding is computed for the answers and the gold answers. The cosine similarity is then computed, and the average is displayed.
 The tests can also be inspected in the files `evaluation_avant.json` (before) and `evaluation_apres.json` (after).
 
 ## Using the model
