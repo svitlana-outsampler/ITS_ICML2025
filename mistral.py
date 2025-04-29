@@ -185,4 +185,4 @@ if __name__ == "__main__":
     #ou = OUProcess()
     #ou.generate("toto.png", "toto.txt")
 
-    chat.dataset(50)
+    chat.dataset(200)

@@ -176,17 +176,17 @@ training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
     per_device_train_batch_size=2,
     gradient_accumulation_steps=8,
-    #num_train_epochs=50,
+    num_train_epochs=5,
     learning_rate=2e-4,
     fp16=True,
     logging_dir=f"{OUTPUT_DIR}/logs",   # <- Où les logs seront sauvegardés
     logging_steps=10, 
     #evaluation_strategy="epoch",
     save_strategy="steps",       # Save every X steps
-    save_steps=100,         # ← Save every 100 steps → 1000 / 100 = 10 checkpoints
+    save_steps=10,         # ← Save every 100 steps → 1000 / 100 = 10 checkpoints
     save_total_limit=2,       # ← Keep only the last 2 checkpoints
     report_to="none",
-    max_steps=1000,
+    max_steps=100,
 )
 
 
