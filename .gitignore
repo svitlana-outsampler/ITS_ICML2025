@@ -1,0 +1,6 @@
+evaluation_apres.json
+evaluation_avant.json
+qwen2.5-lora-output/*
+slurm-*.out
+test_jsonl.jsonl
+.gitignore
