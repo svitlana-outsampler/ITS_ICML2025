@@ -8,4 +8,4 @@ xcurve = [i for i in range(1, len(ycurve)+1)]
 
 plt.plot(xcurve, ycurve)
 
-
+plt.show()
