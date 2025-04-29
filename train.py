@@ -176,20 +176,22 @@ training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
     per_device_train_batch_size=2,
     gradient_accumulation_steps=8,
-    num_train_epochs=50,
+    #num_train_epochs=50,
     learning_rate=2e-4,
     fp16=True,
     logging_dir=f"{OUTPUT_DIR}/logs",   # <- Où les logs seront sauvegardés
     logging_steps=10, 
-    save_strategy="epoch",
     #evaluation_strategy="epoch",
+    save_strategy="steps",       # Save every X steps
+    save_steps=100,         # ← Save every 100 steps → 1000 / 100 = 10 checkpoints
+    save_total_limit=2,       # ← Keep only the last 2 checkpoints
     report_to="none",
-    max_steps=1000,  # optionnel
-    #optim="paged_adamw_8bit",  # si tu veux économiser la mémoire
-    # **{
-    #     "max_length": 2048,  # ← utile si jamais tu utilises la génération dans l’éval
-    # }
+    max_steps=1000,
 )
+
+
+import logging
+logging.basicConfig(level=logging.INFO, force=True) 
 
 trainer = Trainer(
     model=model,
@@ -199,6 +201,10 @@ trainer = Trainer(
     tokenizer=tokenizer,
     # label_names=["labels"]
 )
+
+trainer.args.logging_strategy = "steps"
+trainer.args.logging_steps = 10 
+
 
 print("\nÉvaluation avant entraînement (similarité sémantique)...")
 score_before = compute_semantic_similarity(model, tokenizer, dataset["test"], output_file="evaluation_avant.json")
