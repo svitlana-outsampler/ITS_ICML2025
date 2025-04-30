@@ -158,6 +158,7 @@ class Mistral:
             ts_list = ts.tolist()
 
             data_json.append({
+                "index": i,
                 "question": "Describe the time series in three sentences. First sentence: describe increasing/decreasing/flat pattern. Second sentence: describe the overall trend and the noise. Third sentence: describe local and globe extrema.",
                 "series": ts_list,
                 "image": os.path.join(directory, f"ou_process_{i}.png"),

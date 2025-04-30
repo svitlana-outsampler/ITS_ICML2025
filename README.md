@@ -49,9 +49,9 @@ The values and text are also stored in a json file `data.json`.
 
 ## Training the model
 
-First convert the dataset to a format that can be used by the training script. This is done by the script `convert.py` that creates a single file `test_jsonl.jsonl` containing 50 pairs of reference prompt/answers.
+First convert the dataset to a format that can be used by the training script. This is done by the script `convert.py` that creates a single file `test_jsonl.jsonl` containing 50 (or more) pairs of reference prompt/answers.
 
-The training can last a couple of hours. For this it is necessary to launch it batch mode. This is done by connecting to the server `gaya.math.unistra.fr`. Go the installation directory of `llm_ts` 
+The training can last a couple of hours. For this it is necessary to launch it batch mode. This is done by connecting to the server `gaya.math.unistra.fr`. Go to the installation directory of `llm_ts` 
 and type
 
 ```bash
@@ -65,14 +65,20 @@ To monitor the progression, here are a few useful commands:
 squeue -u <your_username>
 scontrol show job <job_id>
 scancel <job_id>
-tail -f slurm-<job_id>.out
+tail -f train.out
+tail -f train.err
 ```
 The computations are periodically saved, and could be stopped and restarted but this is not yet implemented.
+
+The training files are saved in the directory corresponding to the model name.
 
 
 ## Testing the model
 At the end of the training, the model is tested against 10% of the dataset (a part that is not used for training). A semantic embedding is computed for the answers and the gold answers. The cosine similarity is then computed, and the average is displayed.
 The tests can also be inspected in the files `evaluation_avant.json` (before) and `evaluation_apres.json` (after).
+
+A more friendly is obtained with the script `check_training.py` that displays the results on the test set in a more readable way. The `check_training.py` must be launched in the model directory.
+The pictures are saved in the directory `plotdiag`.
 
 ## Using the model
 
@@ -81,3 +87,27 @@ Conversion to `.gguf` format.
 TO DO 
 
 Inference: TO DO
+
+## Results
+
+The dataset contains 200 samples, 90% are used for training, 10% are used for testing.
+
+We train on 5 epochs and 100 steps.
+
+The cosine similarity is computed with the sentence-transformers model `sentence-transformers/all-MiniLM-L6-v2`.
+
+In the `check_training.py` script, the cosine similarity is computed with the sentence-transformers model `sentence-transformers/paraphrase-MiniLM-L6-v2`, which is supposed to be more accurate (but in practice, I am not convinced)
+
+### Qwen2.5-0.5B-Instruct
+
+cosine similarity before training:  0.5749
+cosine similarity after training:   0.8391
+
+
+### Qwen2.5-1.5B-Instruct
+
+cosine similarity before training:  0.7461
+cosine similarity after training:  0.7959
+
+
+The improvment seems to be better for the small model.

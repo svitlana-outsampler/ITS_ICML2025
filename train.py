@@ -6,8 +6,21 @@ import json
 
 # === CONFIGURATION ===
 MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
+#MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
 DATASET_PATH = "test_jsonl.jsonl"
-OUTPUT_DIR = "./qwen2.5-lora-output"
+#OUTPUT_DIR = "./qwen2.5-lora-output"
+# OUTPUT_DIR = "./qwen2.5-small-lora-output"
+
+
+# Extraire le nom du modèle à partir de MODEL_NAME
+model_name_parts = MODEL_NAME.split('/')
+model_short_name = model_name_parts[-1] if model_name_parts else "unknown_model"
+
+# Construire le chemin de sortie en utilisant le nom du modèle
+OUTPUT_DIR = f"./{model_short_name.lower()}-lora-output"
+
+print("training saved in ", OUTPUT_DIR)
+
 
 # === CHARGEMENT DU DATASET JSONL ===
 def load_jsonl_dataset(path):
@@ -16,11 +29,16 @@ def load_jsonl_dataset(path):
     return Dataset.from_list(lines)
 
 raw_dataset = load_jsonl_dataset(DATASET_PATH)
+print("split dataset")
 split_dataset = raw_dataset.train_test_split(test_size=0.10)
 dataset = DatasetDict({
     "train": split_dataset["train"],
     "test": split_dataset["test"]
 })
+
+# show the size of the two splits
+print(f"Train size: {len(dataset['train'])}")
+print(f"Test size: {len(dataset['test'])}")
 
 # === TOKENIZER ===
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
@@ -126,8 +144,9 @@ from sentence_transformers import SentenceTransformer, util
 model_st = SentenceTransformer("all-MiniLM-L6-v2")
 
 def compute_semantic_similarity(model, tokenizer, dataset, output_file=None):
-    dataset = dataset.select(range(5))  # Pour prendre les 5 premiers exemples
+    #dataset = dataset.select(range(5))  # Pour prendre les 5 premiers exemples
     examples = dataset.to_list()
+    print("treat ", len(examples), " examples")
     inputs = [ex["input"] for ex in examples]
     gold_outputs = [ex["output"] for ex in examples]
     
@@ -156,15 +175,16 @@ def compute_semantic_similarity(model, tokenizer, dataset, output_file=None):
     emb_generated = model_st.encode(generated_outputs, convert_to_tensor=True)
     emb_gold = model_st.encode(gold_outputs, convert_to_tensor=True)
 
-    cosine_scores = util.cos_sim(emb_generated, emb_gold)
-    diagonal_scores = cosine_scores.diag().cpu().numpy()
+    #cosine_scores = util.cos_sim(emb_generated, emb_gold)
+    #diagonal_scores = cosine_scores.diag().cpu().numpy()
+    diagonal_scores = torch.nn.functional.cosine_similarity(emb_generated, emb_gold).cpu().numpy()
 
     avg_score = float(diagonal_scores.mean())
 
     # Sauvegarde des résultats dans un fichier JSON si un nom est fourni
     if output_file:
-        output_data = [{"input": inp, "generated_output": gen_out, "gold_output": gold_out} 
-                       for inp, gen_out, gold_out in zip(inputs, generated_outputs, gold_outputs)]
+        output_data = [{"input": inp, "generated_output": gen_out, "gold_output": gold_out, "score": float(score)}
+                       for inp, gen_out, gold_out, score in zip(inputs, generated_outputs, gold_outputs, diagonal_scores)]
         with open(output_file, "w") as f:
             json.dump(output_data, f, indent=4)
 
@@ -176,7 +196,7 @@ training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
     per_device_train_batch_size=2,
     gradient_accumulation_steps=8,
-    num_train_epochs=5,
+    num_train_epochs=7,
     learning_rate=2e-4,
     fp16=True,
     logging_dir=f"{OUTPUT_DIR}/logs",   # <- Où les logs seront sauvegardés
@@ -186,7 +206,7 @@ training_args = TrainingArguments(
     save_steps=10,         # ← Save every 100 steps → 1000 / 100 = 10 checkpoints
     save_total_limit=2,       # ← Keep only the last 2 checkpoints
     report_to="none",
-    max_steps=100,
+    max_steps=150,
 )
 
 
@@ -205,13 +225,16 @@ trainer = Trainer(
 trainer.args.logging_strategy = "steps"
 trainer.args.logging_steps = 10 
 
+import os
+# Create the output directory if it doesn't exist
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 print("\nÉvaluation avant entraînement (similarité sémantique)...")
-score_before = compute_semantic_similarity(model, tokenizer, dataset["test"], output_file="evaluation_avant.json")
+score_before = compute_semantic_similarity(model, tokenizer, dataset["test"], output_file=os.path.join(OUTPUT_DIR, "evaluation_avant.json"))
 print(f"Score moyen avant entraînement : {score_before:.4f}")
 trainer.train()
 print("\nÉvaluation après entraînement (similarité sémantique)...")
-score_after = compute_semantic_similarity(model, tokenizer, dataset["test"], output_file="evaluation_apres.json")
+score_after = compute_semantic_similarity(model, tokenizer, dataset["test"], output_file=os.path.join(OUTPUT_DIR, "evaluation_apres.json"))
 print(f"Score moyen après entraînement : {score_after:.4f}")
 
 model.save_pretrained(OUTPUT_DIR)

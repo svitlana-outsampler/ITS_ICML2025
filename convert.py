@@ -12,13 +12,16 @@ def convert_dataset_to_jsonl(input_path, output_path, truncate_series=1000):
         data = json.load(f)
 
     with open(output_path, 'w') as out_file:
+        print("found ", len(data), " examples")
         for item in data:
+            index = item["index"]
             series = item["series"][:truncate_series]  # Tronque si nécessaire
             series_str = ', '.join(f"{x:.4f}" for x in series)
             input_text = f"{item['question']} Series: [{series_str}]"
             output_text = item["description"].strip()
 
             jsonl_obj = {
+                "index": index,
                 "input": input_text,
                 "output": output_text
             }
@@ -28,4 +31,4 @@ def convert_dataset_to_jsonl(input_path, output_path, truncate_series=1000):
     print(f"Conversion terminée : {output_path}")
 
 # Exemple d'utilisation
-convert_dataset_to_jsonl('dataset/test_data.json', 'test_jsonl.jsonl')
+convert_dataset_to_jsonl('dataset/data.json', 'test_jsonl.jsonl')
