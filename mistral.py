@@ -15,6 +15,20 @@ Put the description in a JSON format with the following pattern
 """
 
 
+# check that a json object can be extracted from a string and that
+# the json object has the keys "trend", "noise", and "extrema"
+def check_json_format(json_string):
+    try:
+        print("json_string=", json_string)
+        json_object = json.loads(json_string)
+        if "trend" in json_object and "noise" in json_object and "extrema" in json_object:
+            return True
+        else:
+            return False
+    except json.JSONDecodeError:
+        return False
+
+
 # a small class for generating Orstein Uhlenbeck process
 class OUProcess:
     def __init__(self):
@@ -124,7 +138,12 @@ class Mistral:
         if self.dryrun:   
             #print(json.dumps(payload, indent=4))
             # generate a fake but valid answer
-            return {"choices": [{"message": {"content": "This is a fake answer."}}]}
+            content = {
+                "trend": "upward",
+                "noise": "low",
+                "extrema": "extrema at the begining and at the end of the series"
+            }
+            return {"choices": [{"message": {"content": json.dumps(content)}}]}
         else:
             response = requests.post(self.api_url, headers=headers, json=payload)
             if response.status_code == 200:
@@ -155,24 +174,32 @@ class Mistral:
                 os.path.join(directory, f"ou_process_{i}.png"),
                 os.path.join(directory, f"ou_process_{i}.dat")
             )
-            response = self.ask(
-                os.path.join(directory, f"ou_process_{i}.png"),
-                prompt_ts
-            )
-            print("response=",response)
-            with open(os.path.join(directory, f"ou_process_{i}.txt"), "w") as f:
-                f.write(response["choices"][0]["message"]["content"])
-                f.write("\n")
-            
-            ts_list = ts.tolist()
+            while True:
+                response = self.ask(
+                    os.path.join(directory, f"ou_process_{i}.png"),
+                    prompt_ts
+                )
+                # print("response=",response)
+                # print("sub response=",response["choices"][0]["message"]["content"])
+                json_response = response["choices"][0]["message"]["content"]
+                print("json_response=",json_response)
+                with open(os.path.join(directory, f"ou_process_{i}.txt"), "w") as f:
+                    f.write(json.dumps(json_response, indent=4))
+                    f.write("\n")
+                
+                ts_list = ts.tolist()
 
-            data_json.append({
-                "index": i,
-                "question": prompt_ts,
-                "series": ts_list,
-                "image": os.path.join(directory, f"ou_process_{i}.png"),
-                "description": response["choices"][0]["message"]["content"]
-            })
+                # check that the json_response match exactly the expected format
+
+                if check_json_format(json_response):
+                    data_json.append({
+                        "index": i,
+                        "question": prompt_ts,
+                        "series": ts_list,
+                        "image": os.path.join(directory, f"ou_process_{i}.png"),
+                        "description": json.loads(json_response)
+                    })
+                    break
         
         with open(os.path.join(directory, "data.json"), "w") as f:
             json.dump(data_json, f, indent=4)
