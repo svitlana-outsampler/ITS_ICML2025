@@ -1,3 +1,10 @@
+# todo
+- [ ] modify the mistral.py script for appending generated data to data.json (instead of erasing it)
+- [] launch it for generating 1000 samples
+- [] adapt the convert.py script for computing diagnostics on each of the three sentences: cosines + llm evaluation (thus four metrics)
+- [] train on 200 steps and 1000 samples
+- [] discuss results
+
 # llm_ts
 
 This project intends to use small LLM to interpret time series data. As is, small LLMs are not very powerful in this task. 

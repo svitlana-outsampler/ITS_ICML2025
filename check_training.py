@@ -36,9 +36,20 @@ def detect_contradiction_nli(premise, hypothesis):
     with torch.no_grad():
         logits = nli_model(**inputs).logits
     probs = F.softmax(logits, dim=1)
-    labels = ['entailment', 'neutral', 'contradiction']
+    #labels = ['entailment', 'neutral', 'contradiction']
+    labels = ['contradiction', 'neutral', 'entailment'] 
     max_idx = torch.argmax(probs).item()
     return labels[max_idx], probs[0][max_idx].item()
+
+
+# test the detection of contradiction
+premise = "The cat is in the tree."
+hypothesis = "The moggy is swimming."
+label, score = detect_contradiction_nli(premise, hypothesis)
+print(f"Label: {label}, Score: {score}")
+
+# stop here for the moment
+#exit()
 
 # Load JSON files
 with open('evaluation_avant.json', 'r') as f:
