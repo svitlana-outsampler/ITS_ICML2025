@@ -18,7 +18,8 @@ def convert_dataset_to_jsonl(input_path, output_path, truncate_series=1000):
             series = item["series"][:truncate_series]  # Tronque si nécessaire
             series_str = ', '.join(f"{x:.4f}" for x in series)
             input_text = f"{item['question']} Series: [{series_str}]"
-            output_text = item["description"].strip()
+            # write output json object in a string
+            output_text = json.dumps((item["description"]))
 
             jsonl_obj = {
                 "index": index,
