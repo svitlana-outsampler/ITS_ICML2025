@@ -6,6 +6,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+prompt_ts = r"""
+Describe the time series in three sentences. First sentence: describe increasing/decreasing/flat trend. Second sentence: possible presence and intensity of noise. Third sentence: describe local and global extrema.
+Put the description in a JSON format with the following pattern
+{ "trend": <sentence1>,
+  "noise": <sentence2>,
+  "extrema": <sentence3> }.
+"""
+
+
 # a small class for generating Orstein Uhlenbeck process
 class OUProcess:
     def __init__(self):
@@ -57,8 +66,8 @@ class Mistral:
     def __init__(self, dryrun = True):
         self.api_key = os.environ.get("MISTRAL_API_KEY")
         self.api_url = "https://api.mistral.ai/v1/chat/completions"
-        self.model = "pixtral-large-latest"
-        #self.model = "pixtral-12b-2409"
+        #self.model = "pixtral-large-latest"
+        self.model = "pixtral-12b-2409"
         self.dryrun = dryrun # if True, do not send the request to the LLM
         print("Mistral initialized")
         #print(f"Mistral API key: {self.api_key}")
@@ -105,6 +114,8 @@ class Mistral:
                     ]
                 }
             ],
+            "response_format": {"type": "json_object"},
+            #"response_format":
             "temperature": 0.7,
             "max_tokens": 1024,
             "top_p": 0.95,
@@ -146,11 +157,9 @@ class Mistral:
             )
             response = self.ask(
                 os.path.join(directory, f"ou_process_{i}.png"),
-                "Describe the time series in three sentences. "
-                "First sentence: describe increasing/decreasing/flat pattern. "
-                "Second sentence: describe the overall trend and the noise. "
-                "Third sentence: describe local and globe extrema."
+                prompt_ts
             )
+            print("response=",response)
             with open(os.path.join(directory, f"ou_process_{i}.txt"), "w") as f:
                 f.write(response["choices"][0]["message"]["content"])
                 f.write("\n")
@@ -159,7 +168,7 @@ class Mistral:
 
             data_json.append({
                 "index": i,
-                "question": "Describe the time series in three sentences. First sentence: describe increasing/decreasing/flat pattern. Second sentence: describe the overall trend and the noise. Third sentence: describe local and globe extrema.",
+                "question": prompt_ts,
                 "series": ts_list,
                 "image": os.path.join(directory, f"ou_process_{i}.png"),
                 "description": response["choices"][0]["message"]["content"]
@@ -186,4 +195,4 @@ if __name__ == "__main__":
     #ou = OUProcess()
     #ou.generate("toto.png", "toto.txt")
 
-    chat.dataset(200)
+    chat.dataset(3)
