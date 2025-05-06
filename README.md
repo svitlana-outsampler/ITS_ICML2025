@@ -114,7 +114,7 @@ cosine similarity after training:   to do
 ### Qwen2.5-1.5B-Instruct
 
 cosine similarity before training:  0.6403
-cosine similarity after training:  0.7959
+cosine similarity after training:  to do
 
 
 The improvment seems to be better for the small model.
