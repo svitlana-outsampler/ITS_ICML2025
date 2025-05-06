@@ -55,12 +55,21 @@ def load_jsonl_dataset(num_samples: int, path: str) -> Dataset:
         logger.error(f"Error loading dataset {path}: {e}")
         raise
 
+# def create_tokenizer(model_name_or_path: str) -> AutoTokenizer:
+#     """Creates and configures the tokenizer."""
+#     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=True)
+#     if tokenizer.pad_token is None:
+#         logger.warning("Tokenizer does not have a pad token. Setting pad_token to eos_token.")
+#         tokenizer.pad_token = tokenizer.eos_token
+#     return tokenizer
 def create_tokenizer(model_name_or_path: str) -> AutoTokenizer:
     """Creates and configures the tokenizer."""
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=True)
     if tokenizer.pad_token is None:
         logger.warning("Tokenizer does not have a pad token. Setting pad_token to eos_token.")
         tokenizer.pad_token = tokenizer.eos_token
+    # Ensure padding is applied on the right side
+    tokenizer.padding_side = 'right'  # Add this line
     return tokenizer
 
 def preprocess_data(examples: Dict[str, List[Any]], tokenizer: AutoTokenizer, max_length: int) -> Dict[str, List[int]]:
