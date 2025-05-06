@@ -1,8 +1,8 @@
 # todo
-- [ ] modify the mistral.py script for appending generated data to data.json (instead of erasing it)
-- [] launch it for generating 1000 samples
+- [x] modify the mistral.py script for appending generated data to data.json (instead of erasing it)
+- [x] launch it for generating 1000 samples
 - [] adapt the convert.py script for computing diagnostics on each of the three sentences: cosines + llm evaluation (thus four metrics)
-- [] train on 200 steps and 1000 samples
+- [x] train on 200 steps and 1000 samples
 - [] discuss results
 
 # llm_ts
@@ -97,9 +97,9 @@ Inference: TO DO
 
 ## Results
 
-The dataset contains 200 samples, 90% are used for training, 10% are used for testing.
+The dataset contains 200-1000 samples, 90% are used for training, 10% are used for testing.
 
-We train on 5 epochs and 100 steps.
+We train on 4 epochs
 
 The cosine similarity is computed with the sentence-transformers model `sentence-transformers/all-MiniLM-L6-v2`.
 
@@ -107,13 +107,13 @@ In the `check_training.py` script, the cosine similarity is computed with the se
 
 ### Qwen2.5-0.5B-Instruct
 
-cosine similarity before training:  0.5749
-cosine similarity after training:   0.8391
+cosine similarity before training:  to do
+cosine similarity after training:   to do
 
 
 ### Qwen2.5-1.5B-Instruct
 
-cosine similarity before training:  0.7461
+cosine similarity before training:  0.6403
 cosine similarity after training:  0.7959
 
 
