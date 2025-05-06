@@ -52,10 +52,10 @@ print(f"Label: {label}, Score: {score}")
 #exit()
 
 # Load JSON files
-with open('evaluation_avant.json', 'r') as f:
+with open('evaluation_before_training.json', 'r') as f:
     evaluation_avant = json.load(f)
 
-with open('evaluation_apres.json', 'r') as f:
+with open('evaluation_final.json', 'r') as f:
     evaluation_apres = json.load(f)
 
 assert len(evaluation_avant) == len(evaluation_apres), "Files do not have the same number of entries."
@@ -65,6 +65,8 @@ def plot_and_save(i):
     series = json.loads(input_data.split('Series: ')[1])
     gold_output = evaluation_avant[i]['gold_output']
     diagnostic_avant = evaluation_avant[i]['generated_output']
+    # cute the string to the first 600 characters
+    diagnostic_avant = diagnostic_avant[:600]
     diagnostic_apres = evaluation_apres[i]['generated_output']
 
     print(f"Calculating similarity scores for entry {i}...")

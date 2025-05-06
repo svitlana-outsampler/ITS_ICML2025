@@ -12,7 +12,7 @@
 #SBATCH --error=train.err
 
 
-cat /proc/cpuinfo
+#cat /proc/cpuinfo
 srun rocm-smi
 cd /home/u1/helluy/gitlab/llm_ts
 source /home/u1/helluy/gitlab/llm_ts/.venv/bin/activate

@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import json
 import logging
 import os
@@ -32,11 +33,12 @@ logger = logging.getLogger(__name__)
 
 # === HELPER FUNCTIONS ===
 
-def load_jsonl_dataset(path: str) -> Dataset:
+def load_jsonl_dataset(num_samples: int, path: str) -> Dataset:
     """Loads a dataset from a JSON Lines file."""
     try:
+        # take only the num_samples fisrst lines of the file f
         with open(path, 'r', encoding='utf-8') as f:
-            lines = [json.loads(l) for l in f]
+            lines = [json.loads(l) for i, l in enumerate(f) if i < num_samples]
         if not lines:
             raise ValueError(f"Dataset file is empty: {path}")
         # Check if required columns exist
@@ -172,6 +174,13 @@ sbert_model = None # Global variable for Sentence Transformer model
 def compute_metrics(eval_preds):
     """Computes perplexity during evaluation."""
     logits, labels = eval_preds
+    
+    # Convert numpy arrays to PyTorch tensors if needed
+    if isinstance(logits, np.ndarray):
+        logits = torch.from_numpy(logits)
+    if isinstance(labels, np.ndarray):
+        labels = torch.from_numpy(labels)
+    
     # Shift logits and labels for autoregressive models
     # logits shape: (batch_size, seq_len, vocab_size)
     # labels shape: (batch_size, seq_len)
@@ -184,17 +193,20 @@ def compute_metrics(eval_preds):
     active_labels = shift_labels[valid_labels_mask]
 
     # Calculate perplexity only if there are valid labels
-    if active_labels.size(0) > 0:
-      try:
-          results = perplexity_metric.compute(predictions=active_logits, model_id='gpt2') # model_id is just a placeholder here
-          return {"perplexity": results["mean_perplexity"]}
-      except Exception as e:
+    if active_labels.numel() > 0:
+        try:
+            # Convert back to numpy for the perplexity metric if needed
+            results = perplexity_metric.compute(
+                predictions=active_logits.numpy() if isinstance(active_logits, torch.Tensor) else active_logits,
+                model_id='gpt2'  # model_id is just a placeholder here
+            )
+            return {"perplexity": results["mean_perplexity"]}
+        except Exception as e:
             logger.warning(f"Could not compute perplexity: {e}")
-            return {"perplexity": float('inf')} # Or some other indicator of failure
+            return {"perplexity": float('inf')}
     else:
-      logger.warning("No valid labels found in batch for perplexity calculation.")
-      return {"perplexity": float('inf')} # Indicate that perplexity couldn't be computed
-
+        logger.warning("No valid labels found in batch for perplexity calculation.")
+        return {"perplexity": float('inf')}
 
 # === Custom Evaluation Callback ===
 class SemanticSimilarityCallback(TrainerCallback):
@@ -229,13 +241,15 @@ class SemanticSimilarityCallback(TrainerCallback):
         output_file = os.path.join(self.output_dir, "custom_eval", f"evaluation_step_{state.global_step}.json")
         score = self.compute_similarity(model, output_file)
         logger.info(f"Semantic similarity score at step {state.global_step}: {score:.4f}")
-        # The Trainer's log method automatically handles logging to configured reporters (like W&B/TensorBoard)
-        if state.is_world_process_zero: # Ensure logging only happens once in distributed settings
-             if hasattr(trainer, 'log'):
-                 trainer.log({"semantic_similarity": score})
-             else: # Fallback for direct logging if trainer instance isn't easily accessible
-                 state.log_history.append({"semantic_similarity": score, "step": state.global_step})
-
+        
+        # The Trainer's log method automatically handles logging to configured reporters
+        if state.is_world_process_zero:  # Ensure logging only happens once in distributed settings
+            # Get the trainer instance from kwargs if available
+            trainer = kwargs.get('trainer', None)
+            if trainer is not None and hasattr(trainer, 'log'):
+                trainer.log({"semantic_similarity": score})
+            else:  # Fallback for direct logging if trainer instance isn't available
+                state.log_history.append({"semantic_similarity": score, "step": state.global_step})
 
     def compute_similarity(self, model, output_file=None) -> float:
         """Computes semantic similarity and optionally saves results."""
@@ -342,7 +356,7 @@ def main(args):
 
     # --- 1. Load and Prepare Dataset ---
     logger.info(f"Loading dataset from: {args.dataset_path}")
-    raw_dataset = load_jsonl_dataset(args.dataset_path)
+    raw_dataset = load_jsonl_dataset(1000,args.dataset_path)
 
     logger.info("Splitting dataset into train and test sets...")
     split_dataset = raw_dataset.train_test_split(test_size=args.test_size, seed=args.seed)
@@ -530,7 +544,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fine-tune a Hugging Face model using LoRA")
 
     # Model & Data Arguments
-    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-0.5B-Instruct", help="Hugging Face model identifier")
+    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-1.5B-Instruct", help="Hugging Face model identifier")
     parser.add_argument("--dataset_path", type=str, required=True, help="Path to the JSONL dataset file")
     parser.add_argument("--output_dir", type=str, default=None, help="Directory to save checkpoints and final model. If None, derived from model name.")
     parser.add_argument("--test_size", type=float, default=0.1, help="Proportion of dataset to use for testing")

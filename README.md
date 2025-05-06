@@ -82,9 +82,9 @@ The training files are saved in the directory corresponding to the model name.
 
 ## Testing the model
 At the end of the training, the model is tested against 10% of the dataset (a part that is not used for training). A semantic embedding is computed for the answers and the gold answers. The cosine similarity is then computed, and the average is displayed.
-The tests can also be inspected in the files `evaluation_avant.json` (before) and `evaluation_apres.json` (after).
+The tests can also be inspected in the files in the subdirectory `custom_eval` of the model directory. The files are `evaluation_before_training.json` (before) and `evaluation_final.json` (after).
 
-A more friendly is obtained with the script `check_training.py` that displays the results on the test set in a more readable way. The `check_training.py` must be launched in the model directory.
+A more friendly display is obtained with the script `check_training.py` that displays the results on the test set in a more readable way. The `check_training.py` must be launched in the `custom_eval` directory (with `python ../../check_training.py`)
 The pictures are saved in the directory `plotdiag`.
 
 ## Using the model
