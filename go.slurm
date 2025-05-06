@@ -16,5 +16,5 @@ cat /proc/cpuinfo
 srun rocm-smi
 cd /home/u1/helluy/gitlab/llm_ts
 source /home/u1/helluy/gitlab/llm_ts/.venv/bin/activate
-python train.py
+python ts_train.py --dataset_path test_jsonl.jsonl
 
