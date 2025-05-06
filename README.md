@@ -2,7 +2,7 @@
 - [x] modify the mistral.py script for appending generated data to data.json (instead of erasing it)
 - [x] launch it for generating 1000 samples
 - [] adapt the convert.py script for computing diagnostics on each of the three sentences: cosines + llm evaluation (thus four metrics)
-- [x] train on 200 steps and 1000 samples
+- [x] train on 4 epochs and 1000 samples
 - [] discuss results
 
 # llm_ts
