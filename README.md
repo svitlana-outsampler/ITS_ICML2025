@@ -1,9 +1,12 @@
 # todo
 - [x] modify the mistral.py script for appending generated data to data.json (instead of erasing it)
 - [x] launch it for generating 1000 samples
-- [] adapt the convert.py script for computing diagnostics on each of the three sentences: cosines + llm evaluation (thus four metrics)
+- [] change the number presentation with scaling and rounding (1.23456 -> 1 2 3) 
+- [x] adapt the convert.py script for computing diagnostics on each of the three sentences: cosines + llm evaluation (thus four metrics)
 - [x] train on 4 epochs and 1000 samples
 - [] discuss results
+- [] train a model with images (not numbers)
+ 
 
 # llm_ts
 
@@ -103,18 +106,19 @@ We train on 4 epochs
 
 The cosine similarity is computed with the sentence-transformers model `sentence-transformers/all-MiniLM-L6-v2`.
 
+We also compute the NLI score with the model `roberta-large-mnli`.
+
 In the `check_training.py` script, the cosine similarity is computed with the sentence-transformers model `sentence-transformers/paraphrase-MiniLM-L6-v2`, which is supposed to be more accurate (but in practice, I am not convinced)
 
 ### Qwen2.5-0.5B-Instruct
 
-cosine similarity before training:  to do
-cosine similarity after training:   to do
+
+NLI score after training (trend, noise, extrema): [0.495, 0.775, 0.515]    :-(
 
 
 ### Qwen2.5-1.5B-Instruct
 
-cosine similarity before training:  0.6403
-cosine similarity after training:  to do
+
+NLI score after training (trend, noise, extrema): [0.535, 0.815, 0.575] (epoch 4) Mean scores: [0.5, 0.795, 0.495] (epoch 3)
 
 
-The improvment seems to be better for the small model.

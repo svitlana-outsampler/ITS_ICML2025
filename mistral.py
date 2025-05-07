@@ -57,6 +57,7 @@ class OUProcess:
         #print(self.dt)
         # N = int(self.T / self.dt) # This line is redundant as N is already defined
         t = np.linspace(0, self.T, N)      # Time grid
+        ti = np.arange(0, N)  # Time grid for plotting
         X = np.zeros(N)               # Array to store the process values
         
         # Apply random variations to parameters for diversity
@@ -75,11 +76,20 @@ class OUProcess:
             dW = np.random.normal(0, np.sqrt(self.dt))  # Brownian increment
             X[i] = X[i-1] + theta * (mu - X[i-1]) * self.dt + sigma * dW
         
+        # get the max of the sequence
+        max_value = np.max(X)
+        # get the min of the sequence
+        min_value = np.min(X)
+        # scale the sequence so that all the values are between 0 and 99.9999
+        X = (X - min_value) / (max_value - min_value) * 99.9999
+        # round the values to 0 decimal places and convert to integer
+        X = np.floor(X).astype(int)
+        
         # Save the process to a file
         np.savetxt(filename, X)
         
         plt.figure(figsize=(10, 5))
-        plt.plot(t, X )
+        plt.plot(ti, X )
         plt.title('Time Series')
         plt.xlabel('Time')
         plt.ylabel('X(t)')
@@ -328,8 +338,8 @@ if __name__ == "__main__":
     chat = Mistral(dryrun=False) 
                                 
     print("\n--- Running dataset generation (first call) ---")
-    for itt in range(14):
-        chat.dataset(50) # Generate 3 samples
+    for itt in range(2):
+        chat.dataset(50) 
 
     print("\n--- Running dataset generation (second call) ---")
     #chat.dataset(15) # Generate 2 *more* samples (total should be 5)

@@ -1,3 +1,5 @@
+#! python
+#the previous line makes the script executable
 import torch
 import numpy as np
 import json
@@ -65,11 +67,31 @@ def load_jsonl_dataset(num_samples: int, path: str) -> Dataset:
 def create_tokenizer(model_name_or_path: str) -> AutoTokenizer:
     """Creates and configures the tokenizer."""
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, trust_remote_code=True)
+    logger.info(f"Tokenizer for {model_name_or_path} created")
+    logger.info(f"Tokenizer EOS token: {tokenizer.eos_token}")
+    logger.info(f"Tokenizer PAD token: {tokenizer.pad_token}")
     if tokenizer.pad_token is None:
         logger.warning("Tokenizer does not have a pad token. Setting pad_token to eos_token.")
         tokenizer.pad_token = tokenizer.eos_token
     # Ensure padding is applied on the right side
     tokenizer.padding_side = 'right'  # Add this line
+    # test: tokenize a string to see if the tokenizer is working
+    test_string = "01"
+    test_tokens = tokenizer(test_string)
+    logger.info(f"{test_string=} Test tokens: {test_tokens}")
+    test_string = "1555"
+    test_tokens = tokenizer(test_string)
+    logger.info(f"{test_string=} Test tokens: {test_tokens}")
+    test_string = "15"
+    test_tokens = tokenizer(test_string)
+    logger.info(f"{test_string=} Test tokens: {test_tokens}")
+    test_string = "zorro is a fox"
+    test_tokens = tokenizer(test_string)
+    logger.info(f"{test_string=} Test tokens: {test_tokens}")
+    test_string = "fifteen is 15"
+    test_tokens = tokenizer(test_string)
+    logger.info(f"{test_string=} Test tokens: {test_tokens}")
+    #exit()
     return tokenizer
 
 def preprocess_data(examples: Dict[str, List[Any]], tokenizer: AutoTokenizer, max_length: int) -> Dict[str, List[int]]:
@@ -86,10 +108,10 @@ def preprocess_data(examples: Dict[str, List[Any]], tokenizer: AutoTokenizer, ma
     for prompt, response in zip(prompts, responses):
         # Tokenize prompt and response separately (without padding initially)
         # Using add_special_tokens=False might be needed depending on the model if you manually add EOS later
-        prompt_ids = tokenizer(prompt, truncation=False, add_special_tokens=True)["input_ids"]
+        prompt_ids = tokenizer(prompt, truncation=False, add_special_tokens=False)["input_ids"]
         # Add EOS token to response if model expects it
         response_with_eos = response + tokenizer.eos_token
-        response_ids = tokenizer(response_with_eos, truncation=False, add_special_tokens=False)["input_ids"]
+        response_ids = tokenizer(response_with_eos, truncation=False, add_special_tokens=True)["input_ids"]
 
         # Calculate available space for the prompt
         max_prompt_len = max_length - len(response_ids)
@@ -101,9 +123,13 @@ def preprocess_data(examples: Dict[str, List[Any]], tokenizer: AutoTokenizer, ma
             prompt_ids = [] # No space left for prompt
         elif len(prompt_ids) > max_prompt_len:
             # Prompt needs truncation, keep the end (more recent context)
+            logger.warning(f"Prompt is longer than available space ({max_prompt_len}). Truncating prompt.")
             prompt_ids = prompt_ids[-max_prompt_len:]
 
         input_ids = prompt_ids + response_ids
+        # check that the last token is the EOS token
+        if input_ids[-1] != tokenizer.eos_token_id:
+            exit()
         attention_mask = [1] * len(input_ids)
         # Labels: -100 for prompt tokens, actual token IDs for response tokens
         labels = [-100] * len(prompt_ids) + response_ids
@@ -553,14 +579,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fine-tune a Hugging Face model using LoRA")
 
     # Model & Data Arguments
-    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-1.5B-Instruct", help="Hugging Face model identifier")
+    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-0.5B-Instruct", help="Hugging Face model identifier")
     parser.add_argument("--dataset_path", type=str, required=True, help="Path to the JSONL dataset file")
     parser.add_argument("--output_dir", type=str, default=None, help="Directory to save checkpoints and final model. If None, derived from model name.")
     parser.add_argument("--test_size", type=float, default=0.1, help="Proportion of dataset to use for testing")
     parser.add_argument("--max_seq_length", type=int, default=2048, help="Maximum sequence length for tokenization")
 
     # Training Arguments
-    parser.add_argument("--num_train_epochs", type=float, default=3.0, help="Number of training epochs")
+    parser.add_argument("--num_train_epochs", type=float, default=4.0, help="Number of training epochs")
     parser.add_argument("--per_device_train_batch_size", type=int, default=2, help="Batch size per GPU for training")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=8, help="Number of steps to accumulate gradients before updating")
     parser.add_argument("--learning_rate", type=float, default=2e-4, help="Initial learning rate")

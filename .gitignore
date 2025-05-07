@@ -2,4 +2,5 @@ evaluation_apres.json
 evaluation_avant.json
 qwen2.5-lora-output/*
 slurm-*.out
-.gitignore
+dataset/
+qwen2.5-*/

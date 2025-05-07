@@ -69,42 +69,72 @@ def plot_and_save(i):
     diagnostic_avant = diagnostic_avant[:600]
     diagnostic_apres = evaluation_apres[i]['generated_output']
 
+    sentence_gold = []
+    sentence_after = []
+
+    # extract json object from the string before
+    json_gold = json.loads(gold_output)
+    sentence_gold.append(json_gold['trend'])
+    sentence_gold.append(json_gold['noise'])
+    sentence_gold.append(json_gold['extrema'])
+
+    json_after = json.loads(diagnostic_apres)
+    sentence_after.append(json_after['trend'])
+    sentence_after.append(json_after['noise'])
+    sentence_after.append(json_after['extrema'])
+
+
+    # Compute similarity scores for each sentence
     print(f"Calculating similarity scores for entry {i}...")
-    cosine_score_avant, euclidean_score_avant = compute_semantic_similarity(gold_output, diagnostic_avant)
-    cosine_score_apres, euclidean_score_apres = compute_semantic_similarity(gold_output, diagnostic_apres)
+    cosine_score_gold, euclidean_score_gold = [] , []
+    cosine_score_apres, euclidean_score_apres = [] , []
+    cass_label_gold, cass_score_gold = [] , []
+    cass_label_apres, cass_score_apres = [] , []
+    # for each sentence in the json object
+    for iss in range(len(sentence_gold)):
+        a , b = compute_semantic_similarity(sentence_after[iss], sentence_gold[iss])
+        print(sentence_after[iss], sentence_gold[iss], a,b)
+        cosine_score_apres.append(a)
+        euclidean_score_apres.append(b)
+        a,b = detect_contradiction_nli(sentence_after[iss], sentence_gold[iss])
+        cass_label_apres.append(a)
+        cass_score_apres.append(b)
 
-    cass_label_avant, cass_score_avant = detect_contradiction_nli(gold_output, diagnostic_avant)
-    cass_label_apres, cass_score_apres = detect_contradiction_nli(gold_output, diagnostic_apres)
+    # Concatenate the similarity scores and CASS labels properly
+    for cosine, euclidean, cass_label, cass_score in zip(cosine_score_apres, euclidean_score_apres, cass_label_apres, cass_score_apres):
+        diagnostic_apres += f"\n\nCosine Score: {cosine:.4f}\nEuclidean Distance: {euclidean:.4f}"
+        diagnostic_apres += f"\n\n[CASS] Relation: {cass_label} (score: {cass_score:.4f})"
 
-    diagnostic_avant += f"\n\nCosine Score: {cosine_score_avant:.4f}\nEuclidean Distance: {euclidean_score_avant:.4f}"
-    diagnostic_avant += f"\n\n[CASS] Relation: {cass_label_avant} (score: {cass_score_avant:.4f})"
 
-    diagnostic_apres += f"\n\nCosine Score: {cosine_score_apres:.4f}\nEuclidean Distance: {euclidean_score_apres:.4f}"
-    diagnostic_apres += f"\n\n[CASS] Relation: {cass_label_apres} (score: {cass_score_apres:.4f})"
-
-    fig, axs = plt.subplots(4, 1, figsize=(10, 12))
+    fig, axs = plt.subplots(1+3, 1, figsize=(10, 12))
     axs[0].plot(series)
     axs[0].set_xlabel('Time')
     axs[0].set_ylabel('Value')
     axs[0].set_title('Time Series')
 
-    axs[1].axis('off')
-    axs[1].text(0.1, 0.5, gold_output, fontsize=10, verticalalignment='center', wrap=True, color='black')
+    for iss in range(len(sentence_gold)):
+        axs[1+iss].axis('off')
+        disp = 'gold: '+sentence_gold[iss] + ' \n' + 'after: ' + sentence_after[iss] + ' \n' + 'cosine: ' + str(cosine_score_apres[iss]) + ' \n' + 'euclidean: ' + str(euclidean_score_apres[iss]) + ' \n' + 'cass: ' + cass_label_apres[iss] + ' \n' + 'cass score: ' + str(cass_score_apres[iss])
+        color = 'red' if cass_label_apres[iss] == 'no' else 'orange' if cass_label_apres[iss] == 'bof' else 'green'
+        axs[1+iss].text(0.1, 0.5, disp, fontsize=10, verticalalignment='center', wrap=True, color=color)
 
-    color_avant = 'red' if cass_label_avant == 'no' else 'orange' if cass_label_avant == 'bof' else 'blue'
-    color_apres = 'red' if cass_label_apres == 'no' else 'orange' if cass_label_apres == 'bof' else 'green'
+    # color_avant = 'red' if cass_label_gold == 'contradiction' else 'orange' if cass_label_gold == 'neutral' else 'blue'
+    # color_apres = 'red' if cass_label_apres == 'contradiction' else 'orange' if cass_label_apres == 'neutral' else 'green'
 
-    axs[2].axis('off')
-    axs[2].text(0.1, 0.5, diagnostic_avant, fontsize=10, verticalalignment='center', wrap=True, color=color_avant)
+    # axs[2].axis('off')
+    # axs[2].text(0.1, 0.5, diagnostic_avant, fontsize=10, verticalalignment='center', wrap=True, color=color_avant)
 
-    axs[3].axis('off')
-    axs[3].text(0.1, 0.5, diagnostic_apres, fontsize=10, verticalalignment='center', wrap=True, color=color_apres)
+    # axs[2].axis('off')
+    # axs[2].text(0.1, 0.5, diagnostic_apres, fontsize=10, verticalalignment='center', wrap=True, color=color_apres)
 
     fig.suptitle(f'Case number {i}', fontsize=16)
     file_name = os.path.join(output_dir, f'case_{i}.png')
     print(f"Saving figure to {file_name}")
     fig.savefig(file_name)
     plt.close(fig)
+    scores = [0 if ca == 'no' else 1 if ca == 'ok' else 0.5 for ca in cass_label_apres]
+    return scores
+
 
 # Main interaction loop
 while True:
@@ -113,13 +143,21 @@ while True:
     if user_input.lower() == 'q':
         break
     elif user_input.lower() == 'a':
+        mean_scores = [0.,0.,0.]
         for i in range(len(evaluation_avant)):
-            plot_and_save(i)
+            scores = plot_and_save(i)
+            print(f"Scores for case {i}: {scores}")
+            for j in range(3):
+                mean_scores[j] += scores[j]
+        for j in range(3):
+            mean_scores[j] /= len(evaluation_avant)
+        print(f"Mean scores: {mean_scores}")
     else:
         try:
             i = int(user_input)
             if 0 <= i < len(evaluation_avant):
-                plot_and_save(i)
+                scores = plot_and_save(i)
+                print(f"Scores for case {i}: {scores}")
             else:
                 print("Invalid data number. Please try again.")
         except ValueError:
