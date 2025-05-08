@@ -60,9 +60,15 @@ with open('evaluation_final.json', 'r') as f:
 
 assert len(evaluation_avant) == len(evaluation_apres), "Files do not have the same number of entries."
 
+import ast 
+import re
 def plot_and_save(i):
     input_data = evaluation_avant[i]['input']
-    series = json.loads(input_data.split('Series: ')[1])
+    series_str = input_data.split('Series: ')[1].strip()
+    series_str = re.sub(r'\b0+(\d)', r'\1', series_str)
+    series = ast.literal_eval(series_str)
+    #series = json.loads(input_data.split('Series: ')[1])
+    #exit()
     gold_output = evaluation_avant[i]['gold_output']
     diagnostic_avant = evaluation_avant[i]['generated_output']
     # cute the string to the first 600 characters

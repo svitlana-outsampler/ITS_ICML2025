@@ -16,5 +16,6 @@
 srun rocm-smi
 cd /home/u1/helluy/gitlab/llm_ts
 source /home/u1/helluy/gitlab/llm_ts/.venv/bin/activate
-python ts_train.py --dataset_path test_jsonl.jsonl --model_name Qwen/Qwen2.5-1.5B-Instruct
+#python ts_train.py --dataset_path test_jsonl.jsonl --model_name Qwen/Qwen2.5-1.5B-Instruct
+python work_train.py
 
