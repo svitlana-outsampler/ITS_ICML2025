@@ -6,7 +6,7 @@ import json
 
 # === CONFIGURATION ===
 MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
-#MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
+# MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
 DATASET_PATH = "test_jsonl.jsonl"
 #OUTPUT_DIR = "./qwen2.5-lora-output"
 # OUTPUT_DIR = "./qwen2.5-small-lora-output"
@@ -198,13 +198,13 @@ training_args = TrainingArguments(
     gradient_accumulation_steps=8,
     num_train_epochs=7,
     learning_rate=2e-4,
-    fp16=True,
+    bf16=True,
     logging_dir=f"{OUTPUT_DIR}/logs",   # <- Où les logs seront sauvegardés
     logging_steps=10, 
     #evaluation_strategy="epoch",
     save_strategy="steps",       # Save every X steps
-    save_steps=10,         # ← Save every 100 steps → 1000 / 100 = 10 checkpoints
-    save_total_limit=2,       # ← Keep only the last 2 checkpoints
+    save_steps=20,         # ← Save every 100 steps → 1000 / 100 = 10 checkpoints
+    save_total_limit=10,       # ← Keep only the last 2 checkpoints
     report_to="none",
     max_steps=150,
 )

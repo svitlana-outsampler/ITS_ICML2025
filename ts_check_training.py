@@ -52,27 +52,27 @@ print(f"Label: {label}, Score: {score}")
 #exit()
 
 # Load JSON files
-with open('evaluation_before_training.json', 'r') as f:
-    evaluation_avant = json.load(f)
+# with open('evaluation_before_training.json', 'r') as f:
+#     evaluation_avant = json.load(f)
 
 with open('evaluation_final.json', 'r') as f:
     evaluation_apres = json.load(f)
 
-assert len(evaluation_avant) == len(evaluation_apres), "Files do not have the same number of entries."
+# assert len(evaluation_avant) == len(evaluation_apres), "Files do not have the same number of entries."
 
 import ast 
 import re
 def plot_and_save(i):
-    input_data = evaluation_avant[i]['input']
+    input_data = evaluation_apres[i]['input']
     series_str = input_data.split('Series: ')[1].strip()
     series_str = re.sub(r'\b0+(\d)', r'\1', series_str)
     series = ast.literal_eval(series_str)
     #series = json.loads(input_data.split('Series: ')[1])
     #exit()
-    gold_output = evaluation_avant[i]['gold_output']
-    diagnostic_avant = evaluation_avant[i]['generated_output']
+    gold_output = evaluation_apres[i]['gold_output']
+    # diagnostic_avant = evaluation_avant[i]['generated_output']
     # cute the string to the first 600 characters
-    diagnostic_avant = diagnostic_avant[:600]
+    # diagnostic_avant = diagnostic_avant[:600]
     diagnostic_apres = evaluation_apres[i]['generated_output']
 
     sentence_gold = []
@@ -144,24 +144,24 @@ def plot_and_save(i):
 
 # Main interaction loop
 while True:
-    user_input = input(f"Enter the data number to plot (between 0 and {len(evaluation_avant) - 1}), 'a' for all, or 'q' to quit: ")
+    user_input = input(f"Enter the data number to plot (between 0 and {len(evaluation_apres) - 1}), 'a' for all, or 'q' to quit: ")
 
     if user_input.lower() == 'q':
         break
     elif user_input.lower() == 'a':
         mean_scores = [0.,0.,0.]
-        for i in range(len(evaluation_avant)):
+        for i in range(len(evaluation_apres)):
             scores = plot_and_save(i)
             print(f"Scores for case {i}: {scores}")
             for j in range(3):
                 mean_scores[j] += scores[j]
         for j in range(3):
-            mean_scores[j] /= len(evaluation_avant)
+            mean_scores[j] /= len(evaluation_apres)
         print(f"Mean scores: {mean_scores}")
     else:
         try:
             i = int(user_input)
-            if 0 <= i < len(evaluation_avant):
+            if 0 <= i < len(evaluation_apres):
                 scores = plot_and_save(i)
                 print(f"Scores for case {i}: {scores}")
             else:

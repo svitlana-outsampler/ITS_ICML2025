@@ -513,7 +513,7 @@ def main(args):
         train_dataset=tokenized_dataset["train"],
         eval_dataset=tokenized_dataset["test"],
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics, # Add perplexity calculation
+        #compute_metrics=compute_metrics, # Add perplexity calculation
         callbacks=[custom_eval_callback], # Add custom callback
         # data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False), # Optional: if specific collation needed
     )
@@ -583,11 +583,11 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_path", type=str, required=True, help="Path to the JSONL dataset file")
     parser.add_argument("--output_dir", type=str, default=None, help="Directory to save checkpoints and final model. If None, derived from model name.")
     parser.add_argument("--test_size", type=float, default=0.1, help="Proportion of dataset to use for testing")
-    parser.add_argument("--max_seq_length", type=int, default=2048, help="Maximum sequence length for tokenization")
+    parser.add_argument("--max_seq_length", type=int, default=1024, help="Maximum sequence length for tokenization")
 
     # Training Arguments
     parser.add_argument("--num_train_epochs", type=float, default=4.0, help="Number of training epochs")
-    parser.add_argument("--per_device_train_batch_size", type=int, default=2, help="Batch size per GPU for training")
+    parser.add_argument("--per_device_train_batch_size", type=int, default=4, help="Batch size per GPU for training")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=8, help="Number of steps to accumulate gradients before updating")
     parser.add_argument("--learning_rate", type=float, default=2e-4, help="Initial learning rate")
     parser.add_argument("--lr_scheduler_type", type=str, default="cosine", help="Learning rate scheduler type (e.g., 'linear', 'cosine')")
@@ -595,7 +595,7 @@ if __name__ == "__main__":
     parser.add_argument("--logging_steps", type=int, default=20, help="Log training information every N steps")
     parser.add_argument("--save_steps", type=int, default=None, help="Save checkpoint every N steps (overrides save_strategy='epoch' if set)")
     parser.add_argument("--eval_steps", type=int, default=None, help="Evaluate every N steps (overrides evaluation_strategy='epoch' if set)")
-    parser.add_argument("--save_total_limit", type=int, default=2, help="Maximum number of checkpoints to keep")
+    parser.add_argument("--save_total_limit", type=int, default=10, help="Maximum number of checkpoints to keep")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--gradient_checkpointing", action='store_true', help="Enable gradient checkpointing to save memory")
 
