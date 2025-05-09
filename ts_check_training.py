@@ -55,7 +55,17 @@ print(f"Label: {label}, Score: {score}")
 # with open('evaluation_before_training.json', 'r') as f:
 #     evaluation_avant = json.load(f)
 
-with open('evaluation_final.json', 'r') as f:
+import sys
+
+# Check if a file name is provided as a command line argument
+if len(sys.argv) > 1:
+    file_name = sys.argv[1]
+else:
+    file_name = 'evaluation_avant.json'
+    print("No file name provided. Defaulting to 'evaluation_avant.json'.")
+
+# Load the specified JSON file
+with open(file_name, 'r') as f:
     evaluation_apres = json.load(f)
 
 # assert len(evaluation_avant) == len(evaluation_apres), "Files do not have the same number of entries."
@@ -84,10 +94,13 @@ def plot_and_save(i):
     sentence_gold.append(json_gold['noise'])
     sentence_gold.append(json_gold['extrema'])
 
-    json_after = json.loads(diagnostic_apres)
-    sentence_after.append(json_after['trend'])
-    sentence_after.append(json_after['noise'])
-    sentence_after.append(json_after['extrema'])
+    try:
+        json_after = json.loads(diagnostic_apres)
+        sentence_after.append(json_after['trend'])
+        sentence_after.append(json_after['noise'])
+        sentence_after.append(json_after['extrema'])
+    except (json.JSONDecodeError, KeyError):
+        sentence_after.extend([""] * 3)
 
 
     # Compute similarity scores for each sentence
