@@ -201,15 +201,12 @@ class Mistral:
                 print(f"An unexpected error occurred during API call: {e}")
                 return None
 
-            
-        
     # generate a dataset of time series, images and description
     # the series, images and description are stored in the dataset directory
     # in the same time a json object data_json is created: it is a list of dictionnaries
     # each dictionnary has four entries: "question", "series", "image" and "description"
     # the series is a list of floats, the image is a string containing the path to the image
     # and the description is a string
-    # --- MODIFIED TO APPEND ---
     def dataset(self, n):
         directory = "dataset"
         json_file_path = os.path.join(directory, "data.json")
@@ -326,6 +323,69 @@ class Mistral:
             print(f"\nError: Could not write updated dataset to {json_file_path}: {e}")
         except TypeError as e:
              print(f"\nError: Could not serialize data to JSON: {e}. Check data types.")
+
+import re
+
+def ask_noimage(question):
+    """Ask a question using text only (no image) via the LLM API, expecting plain text response."""
+
+    qwen_api_key = os.getenv("TEXTSYNTH_API_KEY")
+    qwen_url = "https://palgania.ovh:8106/v1/chat/completions"
+    if not qwen_api_key:
+        raise ValueError("Qwen API key not found in environment variables.")
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {qwen_api_key}"
+    }
+
+    payload = {
+        "model": "qwen",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": question}
+                ]
+            }
+        ],
+        "max_tokens": 2048,
+        # Removed "response_format"
+    }
+
+    try:
+        print("Sending text-only request to Palgania API...")
+        response = requests.post(qwen_url, headers=headers, json=payload, timeout=60, verify=False)
+        response.raise_for_status()
+        print("Request successful.")
+
+        # Extract and return plain text response from LLM
+        data = response.json()
+        answer = data['choices'][0]['message']['content']
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error calling Palgania API: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"Response status code: {e.response.status_code}")
+            try:
+                print(f"Response text: {e.response.text}")
+            except Exception as json_err:
+                print(f"Could not decode error response JSON: {json_err}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred during API call: {e}")
+        return None
+    
+    #remove the block <think> ... </think>
+    answer = re.sub(r'<think>.*?</think>', '', answer, flags=re.DOTALL)
+    answer = answer.strip()
+    print(f"LLM response: {answer}")
+
+    return answer
+
+            
+        
 
 
 if __name__ == "__main__":

@@ -104,25 +104,74 @@ Inference: TO DO
 
 ## Results
 
-The dataset contains 200-1000 samples, 90% are used for training, 10% are used for testing.
+In order to generate the dataset, we first synthetically generate 200-1000 time series of an Orstein-Uhlenbeck process with 128 samples each. The values are rescaled betwenn 0 and 99 and rounded to nearest integer. This is done for improving the LLM understanding of the time series. It is known that too much digit precision can be confusing for the LLM.
+The Python function for generating one time series is the following:
+```python
+def generate(self, imagename="ou_process.png", filename="ou_process.dat"):
+    ... to do : extract relevant code
+```
+Then the synthetic time series are analyzed with the model "mistral-large-latest" from Mistral AI (https://mistral.ai/) (May 2025).  The prompt used for the analysis is the following:
+```
+Describe the time series in three sentences. First sentence: describe increasing/decreasing/flat trend. Second sentence: possible presence and intensity of noise. Third sentence: describe local and global extrema.\nPut the description in a JSON format with the following pattern\n{ \"trend\": <sentence1>,\n  \"noise\": <sentence2>,\n  \"extrema\": <sentence3> }.\n Series: [00, 01, 02, 03, 04, 04, 06, ... <rest of the series>...]
+```
+The Mistral output is considered as the "gold" output.
 
-We train on 4 epochs
+In the end the dataset contains 200-1000 samples, 90% of which are used for training, the ohter 10% are used for testing.
 
-The cosine similarity is computed with the sentence-transformers model `sentence-transformers/all-MiniLM-L6-v2`.
+We train on approximately 13 epochs and 160 steps, until the loss stops decreasing. The chosen loss is the cross-entropy loss evaluated on the test dataset.
 
-We also compute the NLI score with the model `roberta-large-mnli`.
+Once the finie tuning is done, we evaluate the model on the test dataset for several metrics described below.
 
-In the `check_training.py` script, the cosine similarity is computed with the sentence-transformers model `sentence-transformers/paraphrase-MiniLM-L6-v2`, which is supposed to be more accurate (but in practice, I am not convinced)
+The cosine similarity is computed between the gold and the generated output with the sentence-transformers model `sentence-transformers/all-MiniLM-L6-v2`. This metric is good at detecting semantic similarities, however it is not good at detecting contradictions.
 
-### Qwen2.5-0.5B-Instruct
+We provide in the two tables below the evolution of the cosine similarity during the training for each small model: Qwen2.5 0.5B and Qwen2.5 1.5B.
 
 
-NLI score after training (trend, noise, extrema): to do 
+Therefore we also compute a NLI (Natural Language Inference) score with the model `roberta-large-mnli`. The gold ouput is taken as hypothesis and the small model output is taken as premise. Then the NLI predicts if the premise entails the hypothesis, contradicts it or is neutral. For each sample and each of the three diagnostic sentence ("trend", "noise", "extrema"), we attribute 0 to contradiction, 0.5 to neutral and 1 to entailment and compute the average score over the samples. At the beginning of the training, the small LLM is often even unable to generate a conforming JSON output. In this case, we decide to convert the output to empty sentences. This generally produces a "neutral" diagnostic of the NLI model and thus a score of 0.5.
+
+ It was not possible to human check all the Mistral outputs. In order to measure the confidence that we can have for the produced results, we therefore ask to another large LLM (Qwen3 30 A3B) the same questions and compare the answers thanks to the NLI scores. The average scores for the three sentences are:
+
+ sentence, NLI score
+"trend",
+"noise",
+"extrema",
+
+From the tables, we observe that initially the small LLMs are not able to generate a conforming JSON output. In addition the sentence diagnostics are often wrong. The LLM is generally not even able to detect increasing or decreasing trends. After a few steps, the LLM is able to generate a conforming JSON output. The similarity score mainly detects this capacity, but is not able to detect the validity of the diagnostics and possible contradictions with the "gold" output. The NLI score increases until the end of training and measure the semantic and logical coherence of the generated output. In conclusion, there is clear knowledge distillation from the large LLM to the small LLM.
 
 
 ### Qwen2.5-1.5B-Instruct
 
+| Step          | 0    | 20   | 40    | 60    | 80    | 100   | 120   | 140   | 160   |
+| ------------- | ---- | ---- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
+| Similarity    | 0.66 | 0.95 | 0.95  | 0.96  | 0.96  | 0.96  | 0.95  | 0.96  | 0.96  |
+| NLI "trend"   | 0.45 | 0.50 | 0.475 | 0.70  | 0.70  | 0.825 | 0.825 | 0.75  | 0.875 |
+| NLI "noise"   | 0.50 | 0.70 | 0.725 | 0.725 | 0.875 | 0.925 | 0.775 | 0.775 | 0.90  |
+| NLI "extrema" | 0.50 | 0.45 | 0.575 | 0.575 | 0.60  | 0.575 | 0.55  | 0.55  | 0.65  |
 
-NLI score after training (trend, noise, extrema): to do
 
 
+
+
+### Qwen2.5-0.5B-Instruct
+
+| Step          | 0    | 20    | 40     | 60    | 80    | 100   | 120   | 140   | 160   |
+| ------------- | ---- | ----- | -----  | ----- | ----- | ----- | ----- | ----- | ----- |
+| Similarity    | 0.549 | 0.958  | 0.961  | 0.961  | 0.946  | 0.955  | 0.954  | 0.957  | 0.952 |
+| NLI "trend"   | 0.5   | 0.575 | 0.6    | 0.625  | 0.65  | 0.8  | 0.775  | 0.75  | 0.7 |
+| NLI "noise"   | 0.5   | 0.725 | 0.775  | 0.8    | 0.675  | 0.85  | 0.875  | 0.85  | 0.85 |
+| NLI "extrema" | 0.5   | 0.4   | 0.5    | 0.5    | 0.35  | 0.5  | 0.475  | 0.55  | 0.775 |
+
+
+
+
+
+
+
+<!--
+qwen 2.5 1.5B
+step, 0, 20, 40, 60, 80, 100, 120, 140, 160
+similarity, 0.66, 0.95, 0.95, 0.96, 0.96, 0.96, 0.95, 0.96, 0.96
+NLI "trend", 0.45, 0.5, 0.475,0.7,0.7,0.825,0.825,0.75,0.875
+NLI "noise", 0.5, 0.7, 0.725,0.725,0.875,0.925,0.775, 0.775,0.9
+NLI "extrema", 0.5, 0.45, 0.575,0.575,0.6,0.575,0.55,0.55,0.65
+-->

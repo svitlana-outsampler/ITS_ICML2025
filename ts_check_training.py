@@ -7,6 +7,21 @@ from sklearn.metrics.pairwise import euclidean_distances
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import os
 
+from mistral import ask_noimage
+
+
+# test the function ask_noimage
+
+# test_question = "\nDescribe the time series in three sentences. First sentence: describe increasing/decreasing/flat trend. Second sentence: possible presence and intensity of noise. Third sentence: describe local and global extrema.\nPut the description in a JSON format with the following pattern\n{ \"trend\": <sentence1>,\n  \"noise\": <sentence2>,\n  \"extrema\": <sentence3> }.\n Series: [99, 98, 98, 96, 95, 92, 93, 93, 91, 89, 89, 88, 87, 88, 89, 87, 85, 85, 85, 85, 83, 83, 80, 80, 76, 75, 74, 75, 69, 68, 66, 66, 65, 64, 64, 63, 62, 63, 62, 61, 61, 61, 59, 56, 57, 58, 55, 52, 50, 50, 49, 49, 49, 48, 47, 49, 48, 47, 44, 44, 42, 41, 41, 41, 41, 39, 41, 37, 36, 35, 35, 36, 35, 37, 38, 38, 40, 39, 37, 37, 37, 37, 33, 32, 31, 29, 28, 27, 26, 24, 23, 20, 18, 18, 19, 20, 19, 17, 17, 16, 13, 13, 12, 14, 15, 14, 13, 13, 12, 12, 10, 09, 06, 06, 04, 04, 05, 06, 07, 07, 06, 04, 01, 01, 00, 01, 00, 00]"
+# answer = ask_noimage(test_question)
+
+# # extract the JSON object from the answer
+# json_object = json.loads(answer)
+# print(json_object)
+
+
+# exit()
+
 # Create the directory if it does not exist
 output_dir = 'plotdiag'
 os.makedirs(output_dir, exist_ok=True)
