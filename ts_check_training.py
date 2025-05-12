@@ -286,7 +286,6 @@ while True:
             i = int(user_input)
             if 0 <= i < len(evaluation_apres):
                 if qwenllm == True:
-                    print("Using Qwen LLM")
                     scores = qwen_plot_and_save(i)
                 else:
                     scores = plot_and_save(i)
