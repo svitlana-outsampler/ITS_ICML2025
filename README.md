@@ -4,9 +4,9 @@
 - [] launch it for generating 1000 samples
 - [x] change the number presentation with scaling and rounding (1.23456 -> 1 2 3) 
 - [x] adapt the convert.py script for computing diagnostics on each of the three sentences: cosines + llm evaluation (thus four metrics)
-- []
+- [x] check the dataset against another model (Qwen3 30b)
 - [] train on 4 epochs and 1000 samples
-- [] discuss results
+- [x] discuss results
 - [] train a model with images (not numbers)
  
 
@@ -91,7 +91,7 @@ At the end of the training, the model is tested against 10% of the dataset (a pa
 
 The tests can also be inspected in the files of model directory. The files are `evaluation_avant.json` (before) and `evaluation_checkpoint-xxx.json`, xxx being the number of the checkpoint.
 
-A more friendly display is obtained with the script `ts_check_training.py` that displays the results on the test set in a more readable way. The `ts_check_training.py` must be launched in the model directory (with `python ../ts_check_training.py`)
+A more friendly display is obtained with the script `ts_check_training.py` that displays the results on the test set in a more readable way. The `ts_check_training.py` must be launched in the model directory. The command is `python ../ts_check_training.py <evaluation_checkpoint-xx.json>`. If the name of the JSON file is omitted then the checker ask a remote LLM to generate other outputs that are compared with the gold answers. For tihs to work, an API key must be provided before with the command `export TEXTSYNTH_API_KEY=...`.
 The pictures are saved in the directory `plotdiag`.
 
 ## Using the model
@@ -132,9 +132,11 @@ Therefore we also compute a NLI (Natural Language Inference) score with the mode
  It was not possible to human check all the Mistral outputs. In order to measure the confidence that we can have for the produced results, we therefore ask to another large LLM (Qwen3 30 A3B) the same questions and compare the answers thanks to the NLI scores. The average scores for the three sentences are:
 
  sentence, NLI score
-"trend",
-"noise",
-"extrema",
+"trend", 0.75
+"noise", 0.6
+"extrema", 0.675
+
+todo: this must be discussed because while the NLI score seem bad the sentences are generally in agreement.
 
 From the tables, we observe that initially the small LLMs are not able to generate a conforming JSON output. In addition the sentence diagnostics are often wrong. The LLM is generally not even able to detect increasing or decreasing trends. After a few steps, the LLM is able to generate a conforming JSON output. The similarity score mainly detects this capacity, but is not able to detect the validity of the diagnostics and possible contradictions with the "gold" output. The NLI score increases until the end of training and measure the semantic and logical coherence of the generated output. In conclusion, there is clear knowledge distillation from the large LLM to the small LLM.
 
@@ -162,16 +164,3 @@ From the tables, we observe that initially the small LLMs are not able to genera
 | NLI "extrema" | 0.5   | 0.4   | 0.5    | 0.5    | 0.35  | 0.5  | 0.475  | 0.55  | 0.775 |
 
 
-
-
-
-
-
-<!--
-qwen 2.5 1.5B
-step, 0, 20, 40, 60, 80, 100, 120, 140, 160
-similarity, 0.66, 0.95, 0.95, 0.96, 0.96, 0.96, 0.95, 0.96, 0.96
-NLI "trend", 0.45, 0.5, 0.475,0.7,0.7,0.825,0.825,0.75,0.875
-NLI "noise", 0.5, 0.7, 0.725,0.725,0.875,0.925,0.775, 0.775,0.9
-NLI "extrema", 0.5, 0.45, 0.575,0.575,0.6,0.575,0.55,0.55,0.65
--->
