@@ -7,7 +7,7 @@ import numpy as np
 
 
 prompt_ts = r"""
-Describe the time series in three sentences. First sentence: describe trend (increasing/decreasing/flat). Second sentence: noise intensity (low/medium/high). Third sentence: localisation of maxima and minima (left/middle/right).
+Describe the time series in three sentences. First sentence: describe trend (increasing/decreasing/flat). Second sentence: noise intensity (low/medium/high). Third sentence: approximate localisation of local and global extrema.
 Put the description in a JSON format with the following pattern
 { "trend": <sentence1>,
   "noise": <sentence2>,
@@ -99,7 +99,9 @@ class OUProcess:
         plt.close() # Close the plot to free memory
         return X
 
-
+# définir les modèles: pixtral, mistral, qwen, nollm (génération de phrases factuelles)
+# appeler ask ou ask noimage en fonction du modèle
+# fact checker 
 
 # a simple class for asking questions to a LLM about a given picture
 # the picture is encoded in base64 and sent to the LLM
@@ -109,8 +111,8 @@ class Mistral:
         if not self.api_key and not dryrun:
              raise ValueError("MISTRAL_API_KEY environment variable not set.")
         self.api_url = "https://api.mistral.ai/v1/chat/completions"
-        #self.model = "mistral-large-latest" # Using the recommended model for function calling / JSON mode
-        self.model = "pixtral-large-latest"
+        self.model = "mistral-large-latest" # Using the recommended model for function calling / JSON mode
+        #self.model = "pixtral-large-latest"
         #self.model = "pixtral-12b-2409"
         #self.model = "pixtral-large-latest" # Use pixtral if image input is definitely needed later
         self.dryrun = dryrun # if True, do not send the request to the LLM
@@ -132,6 +134,60 @@ class Mistral:
             print(f"Error encoding image {image_path}: {e}")
             return None
         
+    def ask_noimage(self, question):
+        """Ask a question using the model without an image."""
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self.api_key}"
+        }
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": question}
+                    ]
+                }
+            ],
+            "response_format": {"type": "json_object"},
+            "temperature": 0.7,
+            "max_tokens": 512,
+            "top_p": 1.0,
+            "safe_prompt": False
+        }
+
+        if self.dryrun:
+            print(f"Dry run: Simulating API call for question '{question}'")
+            # Generate a fake but valid answer
+            content = {
+                "response": "This is a simulated response to your question."
+            }
+            # Simulate the structure of the actual API response
+            return {"choices": [{"message": {"content": json.dumps(content)}}]}
+        else:
+            try:
+                print(f"Sending request to Mistral API for question '{question}'...")
+                response = requests.post(self.api_url, headers=headers, json=payload, timeout=60)
+                response.raise_for_status()
+                print("Request successful.")
+                return response.json()
+            except requests.exceptions.RequestException as e:
+                print(f"Error calling Mistral API: {e}")
+                # Log more details if available in the response
+                if hasattr(e, 'response') and e.response is not None:
+                    print(f"Response status code: {e.response.status_code}")
+                    try:
+                        print(f"Response text: {e.response.text}")
+                    except Exception as json_err:
+                        print(f"Could not decode error response JSON: {json_err}")
+                return None
+            except Exception as e:
+                print(f"An unexpected error occurred during API call: {e}")
+                return None
+
+
     def ask(self, image_path, question):
         """Ask a question about the image using Pixtral."""
         # Ensure model is Pixtral for image input
@@ -262,7 +318,8 @@ class Mistral:
             while attempts < max_attempts_per_item and not valid_json_response:
                 attempts += 1
                 print(f"  Attempting LLM description (Attempt {attempts}/{max_attempts_per_item})")
-                response = self.ask(image_path, prompt_ts)
+                # response = self.ask(image_path, prompt_ts)
+                response = self.ask_noimage(prompt_ts)
 
                 if response is None or "choices" not in response or not response["choices"]:
                     print("  Error: Failed to get response from LLM or response is empty.")
@@ -398,8 +455,8 @@ if __name__ == "__main__":
     chat = Mistral(dryrun=False) 
                                 
     print("\n--- Running dataset generation (first call) ---")
-    for itt in range(2):
-        chat.dataset(50) 
+    for itt in range(1):
+        chat.dataset(5) 
 
     print("\n--- Running dataset generation (second call) ---")
     #chat.dataset(15) # Generate 2 *more* samples (total should be 5)
