@@ -7,7 +7,7 @@ import numpy as np
 
 
 prompt_ts = r"""
-Describe the time series in three sentences. First sentence: describe increasing/decreasing/flat trend. Second sentence: possible presence and intensity of noise. Third sentence: describe local and global extrema.
+Describe the time series in three sentences. First sentence: describe trend (increasing/decreasing/flat). Second sentence: noise intensity (low/medium/high). Third sentence: localisation of maxima and minima (left/middle/right).
 Put the description in a JSON format with the following pattern
 { "trend": <sentence1>,
   "noise": <sentence2>,
