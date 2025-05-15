@@ -7,11 +7,13 @@ import numpy as np
 
 
 prompt_ts = r"""
-Describe the time series in three sentences. First sentence: describe trend (increasing/decreasing/flat). Second sentence: noise intensity (low/medium/high). Third sentence: approximate localisation of local and global extrema.
+Describe the time series in three sentences. First sentence: describe trend (increasing/decreasing/flat). Second sentence: noise intensity (low/medium/high). Third sentence: approximate localisation of global maximum (beginning/middle/end) and global minimum (beginning/middle/end).
 Put the description in a JSON format with the following pattern
+```json
 { "trend": <sentence1>,
   "noise": <sentence2>,
-  "extrema": <sentence3> }.
+  "extrema": <sentence3> }
+```
 """
 
 
@@ -39,6 +41,41 @@ def check_json_format(json_string):
         print(f"Warning: An error occurred during JSON check: {e}")
         return False
 
+# tools for detecting contradictions:
+import torch
+import torch.nn.functional as F
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import euclidean_distances
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+# Load sentence transformer model
+model_name = "paraphrase-MiniLM-L6-v2"
+print("Loading model " + model_name)
+model_st = SentenceTransformer(model_name)
+
+# Load a model trained for contradiction detection (NLI)
+nli_model_name = "roberta-large-mnli"
+print("Loading NLI model " + nli_model_name)
+nli_tokenizer = AutoTokenizer.from_pretrained(nli_model_name)
+nli_model = AutoModelForSequenceClassification.from_pretrained(nli_model_name)
+
+def compute_semantic_similarity(gold_output, generated_output):
+    emb_generated = model_st.encode([generated_output], convert_to_tensor=True)
+    emb_gold = model_st.encode([gold_output], convert_to_tensor=True)
+
+    cosine_score = torch.nn.functional.cosine_similarity(emb_generated, emb_gold).cpu().item()
+    euclidean_score = euclidean_distances(emb_generated.cpu(), emb_gold.cpu())[0][0]
+
+    return cosine_score, euclidean_score
+
+def detect_contradiction_nli(premise, hypothesis):
+    inputs = nli_tokenizer.encode_plus(premise, hypothesis, return_tensors='pt', truncation=True)
+    with torch.no_grad():
+        logits = nli_model(**inputs).logits
+    probs = F.softmax(logits, dim=1)
+    #labels = ['entailment', 'neutral', 'contradiction']
+    labels = ['no', 'bof', 'ok'] 
+    max_idx = torch.argmax(probs).item()
+    return labels[max_idx], probs[0][max_idx].item()
 
 # a small class for generating Orstein Uhlenbeck process
 class OUProcess:
@@ -59,7 +96,10 @@ class OUProcess:
         t = np.linspace(0, self.T, N)      # Time grid
         ti = np.arange(0, N)  # Time grid for plotting
         X = np.zeros(N)               # Array to store the process values
-        
+
+        # list of three sentence fact checked sentences
+        sentences = []
+        description = dict()
         # Apply random variations to parameters for diversity
         # Ensure parameters stay within reasonable bounds if necessary
         theta = max(0.1, self.theta + np.random.uniform(-0.5, 0.5)) # Keep theta positive
@@ -68,6 +108,22 @@ class OUProcess:
         #sigma = 0 # Keep this commented unless you specifically want no noise
         x0 = self.x0 + np.random.uniform(-1,1)*2
         X[0] = x0                     # Initial value
+
+        if x0 < mu - 0.8*sigma:
+            description['trend'] = "the time series shows an overall increasing trend."
+        elif x0 > mu + 0.8*sigma:
+            description['trend'] = "the time series shows an overall decreasing trend."
+        else:
+            description['trend'] = "the time series shows no clear trend."
+
+
+        if sigma < 0.5:
+            description['noise']="the time series presents many small fluctuations."
+        elif sigma > 1.5:
+            description['noise']="the time series presents many large fluctuations."
+        else:
+            description['noise']="the time series presents many moderate fluctuations."
+
 
         # Use a fixed seed for reproducibility *within a single generation* if needed
         # np.random.seed(self.seed) # Uncomment if you want deterministic generation based on seed
@@ -84,6 +140,31 @@ class OUProcess:
         X = (X - min_value) / (max_value - min_value) * 99.9999
         # round the values to 0 decimal places and convert to integer
         X = np.floor(X).astype(int)
+
+                # recherche de la localisation en t du maximum et du minimum
+        pos_max = np.argmax(X)
+        print('pos_max', pos_max)
+        if pos_max < 32:
+            pos_desc = "The maximum is reached around the beginning part of the time series"
+        elif pos_max > 96:
+            pos_desc = "The maximum is reached towards the end of the time series"
+        else:
+            pos_desc = "The maximum is reached around the middle of the time series"
+
+        pos_min = np.argmin(X)
+        print('pos_min', pos_min)
+        if pos_min < 32:
+            pos_desc += " and the minimum is reached around the beginning part of the time series."
+        elif pos_min > 96:
+            pos_desc += " and the minimum is reached towards the end of the time series."
+        else:
+            pos_desc += " and the minimum is reached around the middle of the time series."
+
+        description['extrema'] = pos_desc
+        description['parameters'] = "sigma="+str(sigma) + " mu=" + str(mu) + " x0=" + str(x0)
+
+        # convert to a json string
+        description = json.dumps(description)
         
         # Save the process to a file
         np.savetxt(filename, X)
@@ -97,7 +178,7 @@ class OUProcess:
         # now save the picture to a png file
         plt.savefig(imagename)
         plt.close() # Close the plot to free memory
-        return X
+        return X, description
 
 # définir les modèles: pixtral, mistral, qwen, nollm (génération de phrases factuelles)
 # appeler ask ou ask noimage en fonction du modèle
@@ -111,8 +192,8 @@ class Mistral:
         if not self.api_key and not dryrun:
              raise ValueError("MISTRAL_API_KEY environment variable not set.")
         self.api_url = "https://api.mistral.ai/v1/chat/completions"
-        self.model = "mistral-large-latest" # Using the recommended model for function calling / JSON mode
-        #self.model = "pixtral-large-latest"
+        #self.model = "mistral-large-latest" # Using the recommended model for function calling / JSON mode
+        self.model = "pixtral-large-latest"
         #self.model = "pixtral-12b-2409"
         #self.model = "pixtral-large-latest" # Use pixtral if image input is definitely needed later
         self.dryrun = dryrun # if True, do not send the request to the LLM
@@ -265,11 +346,11 @@ class Mistral:
     # and the description is a string
     def dataset(self, n):
         directory = "dataset"
-        json_file_path = os.path.join(directory, "data.json")
-        
+        json_file_path = os.path.join(directory, "data.jsonl")  # Change to data.jsonl
+
         # Ensure the directory exists
         os.makedirs(directory, exist_ok=True)
-        
+
         # --- CHANGE 1: Load existing data ---
         data_json = []
         start_index = 0
@@ -282,12 +363,12 @@ class Mistral:
                         print(f"Warning: {json_file_path} does not contain a JSON list. Starting fresh.")
                         data_json = []
                     else:
-                         # --- CHANGE 2: Calculate starting index ---
+                        # --- CHANGE 2: Calculate starting index ---
                         start_index = len(data_json)
                         print(f"Loaded {start_index} existing entries from {json_file_path}.")
             except json.JSONDecodeError:
                 print(f"Warning: Could not decode JSON from {json_file_path}. Starting fresh.")
-                data_json = [] # Start fresh if file is corrupted
+                data_json = []
             except Exception as e:
                 print(f"Warning: Error reading {json_file_path}: {e}. Starting fresh.")
                 data_json = []
@@ -296,90 +377,151 @@ class Mistral:
 
         # --- Generation Loop ---
         generated_count = 0
-        max_attempts_per_item = 3 # Add a limit to retry attempts for JSON validation
+        max_attempts_per_item = 3  # Add a limit to retry attempts for JSON validation
 
         for i in range(n):
             # --- CHANGE 3: Use correct index for new entries and filenames ---
-            current_index = start_index + i 
-            
-            print(f"Generating time series {i+1}/{n} (Overall index: {current_index})")
-            
+            current_index = start_index + i
+
+            print(f"Generating time series {i}/{n-1} (Overall index: {current_index})")
+
             # Define file paths using the unique current_index
             base_filename = f"ou_process_{current_index}"
             image_path = os.path.join(directory, f"{base_filename}.png")
             dat_path = os.path.join(directory, f"{base_filename}.dat")
-            txt_path = os.path.join(directory, f"{base_filename}.txt") # For saving raw description
-            
+            txt_path = os.path.join(directory, f"{base_filename}.txt")  # For saving raw description
+
             ou = OUProcess()
-            ts = ou.generate(image_path, dat_path)
-            
+            ts, truth = ou.generate(image_path, dat_path)
+
+            # Parse the truth description
+            truth_dict = json.loads(truth)
+
             attempts = 0
             valid_json_response = False
             while attempts < max_attempts_per_item and not valid_json_response:
                 attempts += 1
                 print(f"  Attempting LLM description (Attempt {attempts}/{max_attempts_per_item})")
-                # response = self.ask(image_path, prompt_ts)
-                response = self.ask_noimage(prompt_ts)
+                response = self.ask(image_path, prompt_ts)
 
                 if response is None or "choices" not in response or not response["choices"]:
                     print("  Error: Failed to get response from LLM or response is empty.")
-                    # Decide if you want to retry or break here
-                    # break # Example: Stop trying for this item if API fails
-                    continue # Example: Retry if API failed
+                    continue  # Retry if API failed
 
                 raw_json_string = response["choices"][0]["message"]["content"]
-                print(f"  Raw LLM response: {raw_json_string}") # Log the raw response
-                
+                print(f"  Raw LLM response: {raw_json_string}")
+
                 # Save the raw response text regardless of validity for debugging
                 try:
                     with open(txt_path, "w") as f:
-                        f.write(raw_json_string) # Save the raw string
+                        f.write(raw_json_string)
                 except IOError as e:
-                     print(f"  Warning: Could not write raw description to {txt_path}: {e}")
+                    print(f"  Warning: Could not write raw description to {txt_path}: {e}")
 
                 # Check if the response is valid JSON and has the required keys
                 if check_json_format(raw_json_string):
                     try:
-                         # Re-parse the cleaned string if check_json_format modified it
+                        # Re-parse the cleaned string if check_json_format modified it
                         cleaned_json_string = raw_json_string
                         if cleaned_json_string.strip().startswith("```json"):
-                             cleaned_json_string = cleaned_json_string.strip()[7:-3].strip()
+                            cleaned_json_string = cleaned_json_string.strip()[7:-3].strip()
                         elif cleaned_json_string.strip().startswith("```"):
-                             cleaned_json_string = cleaned_json_string.strip()[3:-3].strip()
+                            cleaned_json_string = cleaned_json_string.strip()[3:-3].strip()
 
                         description_json = json.loads(cleaned_json_string)
                         ts_list = ts.tolist()
 
                         data_json.append({
-                            "index": current_index, # Use the unique overall index
+                            "index": current_index,
                             "question": prompt_ts,
                             "series": ts_list,
-                            "image": image_path, # Store relative path
-                            "description": description_json # Store the parsed JSON object
+                            "image": image_path,
+                            "description": description_json,
+                            "truth_description": truth_dict
                         })
                         valid_json_response = True
                         generated_count += 1
                         print(f"  Successfully added entry with index {current_index}.")
-                        break # Exit the retry loop on success
+                        break  # Exit the retry loop on success
                     except json.JSONDecodeError as e:
-                         print(f"  Error: Could not re-parse validated JSON string: {e}. Raw string was: {raw_json_string}")
-                    except Exception as e: # Catch other unexpected errors during appending
-                         print(f"  An unexpected error occurred while processing valid response: {e}")
+                        print(f"  Error: Could not re-parse validated JSON string: {e}. Raw string was: {raw_json_string}")
+                    except Exception as e:
+                        print(f"  An unexpected error occurred while processing valid response: {e}")
                 else:
                     print(f"  Warning: Invalid JSON format received on attempt {attempts}. Raw response was: {raw_json_string}")
                     if attempts >= max_attempts_per_item:
                         print(f"  Error: Max attempts reached for index {current_index}. Skipping this entry.")
 
-        # --- CHANGE 4: Save the combined data ---
+        # --- CHANGE 4: Save the combined data as JSON Lines ---
         try:
             with open(json_file_path, "w") as f:
-                json.dump(data_json, f, indent=4)
+                for entry in data_json:
+                    json.dump(entry, f)
+                    f.write('\n')
             print(f"\nSuccessfully generated {generated_count} new entries.")
             print(f"Total entries in {json_file_path}: {len(data_json)}")
         except IOError as e:
             print(f"\nError: Could not write updated dataset to {json_file_path}: {e}")
         except TypeError as e:
-             print(f"\nError: Could not serialize data to JSON: {e}. Check data types.")
+            print(f"\nError: Could not serialize data to JSON: {e}. Check data types.")
+
+    def curate_dataset(self):
+        """Curate the dataset by generating new entries and saving them as JSON Lines."""
+        directory = "dataset"
+        json_file_path = os.path.join(directory, "data.jsonl")  # Change to data.jsonl
+        # load the jsonl file
+        data_json = []
+        try:
+            with open(json_file_path, "r") as f:
+                for line in f:
+                    data_json.append(json.loads(line))
+        except IOError as e:
+            print(f"\nError: Could not read dataset from {json_file_path}: {e}")
+            return
+        except json.JSONDecodeError as e:
+            print(f"\nError: Could not decode JSON from {json_file_path}: {e}")
+            return
+        
+        index_to_remove = []
+
+        # for each entry compute NLI score
+        for i, entry in enumerate(data_json):
+            print(f"\nProcessing entry {i}/{len(data_json)-1}")
+            description = entry["description"]
+            # extract the trend
+            trend = description["trend"]
+            # extract the noise
+            noise = description["noise"]
+            # extract the extrema
+            extrema = description["extrema"]
+            truth_description = entry["truth_description"]
+            # extract the trend
+            truth_trend = truth_description["trend"]
+            # extract the noise
+            truth_noise = truth_description["noise"]
+            # extract the extrema
+            truth_extrema = truth_description["extrema"]
+            # compute the NLI score for the trend
+            score_trend = detect_contradiction_nli(trend, truth_trend)
+            print(truth_description["parameters"])
+            print("trend", trend)
+            print("truth_trend", truth_trend)
+            print("score_trend", score_trend)
+            score_noise = detect_contradiction_nli(noise, truth_noise)
+            print("noise", noise)
+            print("truth_noise", truth_noise)
+            print("score_noise", score_noise)
+            score_extrema = detect_contradiction_nli(extrema, truth_extrema)
+            print("extrema", extrema)
+            print("truth_extrema", truth_extrema)
+            print("score_extrema", score_extrema)
+            # remove the entry from the dictionnary if the first tuple value 
+            # of one of the scores is 'no' 
+            if score_trend[0] == 'no' or score_noise[0] == 'no' or score_extrema[0] == 'no':
+                index_to_remove.append(i)
+        print("index_to_remove", index_to_remove)
+        
+
 
 import re
 
@@ -456,12 +598,16 @@ if __name__ == "__main__":
                                 
     print("\n--- Running dataset generation (first call) ---")
     for itt in range(1):
-        chat.dataset(5) 
+        chat.dataset(10) 
 
     print("\n--- Running dataset generation (second call) ---")
     #chat.dataset(15) # Generate 2 *more* samples (total should be 5)
 
     print("\n--- Dataset generation complete ---")
+
+    print("\n--- Curate the dataset ---")
+    chat.curate_dataset()
+    print("\n--- Curating complete ---")
 
     # Optional: Verify the final JSON file content
     json_file_path = os.path.join("dataset", "data.json")
