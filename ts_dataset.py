@@ -211,20 +211,30 @@ class OUProcess:
 # a simple class for asking questions to a LLM about a given picture
 # the picture is encoded in base64 and sent to the LLM
 class Mistral:
-    def __init__(self, dryrun = False):
-        self.api_key = os.environ.get("MISTRAL_API_KEY")
-        if not self.api_key and not dryrun:
-             raise ValueError("MISTRAL_API_KEY environment variable not set.")
-        self.api_url = "https://api.mistral.ai/v1/chat/completions"
-        #self.model = "mistral-large-latest" # Using the recommended model for function calling / JSON mode
-        #self.model = "pixtral-large-latest"
-        self.model = "pixtral-12b-2409"
-        #self.model = "pixtral-large-latest" # Use pixtral if image input is definitely needed later
-        self.dryrun = dryrun # if True, do not send the request to the LLM
-        print("Mistral initialized")
+    def __init__(self, dryrun = False, image = False):
+        self.dryrun = dryrun
+        self.image = image
+        if image:
+            self.api_key = os.environ.get("MISTRAL_API_KEY")
+            if not self.api_key and not dryrun:
+                raise ValueError("MISTRAL_API_KEY environment variable not set.")
+            self.api_url = "https://api.mistral.ai/v1/chat/completions"
+            #self.model = "mistral-large-latest" # Using the recommended model for function calling / JSON mode
+            #self.model = "pixtral-large-latest"
+            self.model = "pixtral-12b-2409"
+            #self.model = "pixtral-large-latest" # Use pixtral if image input is definitely needed later
+            print("Mistral initialized")
+        else:
+            self.api_key = os.environ.get("TEXTSYNTH_API_KEY")
+            if not self.api_key and not dryrun:
+                raise ValueError("TEXTSYNTH_API_KEY environment variable not set.")
+            self.api_url = "https://palgania.ovh:8106/v1/chat/completions"
+            self.model = "qwen3-30b-a3b" # Using the recommended model for function calling / JSON mode
+            print("Palgania initialized")
+
         #print(f"Mistral API key: {'Set' if self.api_key else 'Not Set'}")
-        print(f"Mistral API URL: {self.api_url}")
-        print(f"Mistral model: {self.model}")
+        print(f"LLM API URL: {self.api_url}")
+        print(f"LLM model: {self.model}")
         print(f"Dry run: {self.dryrun}")
     
     def encode_image(self, image_path):
@@ -273,13 +283,13 @@ class Mistral:
             return {"choices": [{"message": {"content": json.dumps(content)}}]}
         else:
             try:
-                print(f"Sending request to Mistral API for question '{question}'...")
+                print(f"Sending request to API for question '{question}'...")
                 response = requests.post(self.api_url, headers=headers, json=payload, timeout=60)
                 response.raise_for_status()
                 print("Request successful.")
                 return response.json()
             except requests.exceptions.RequestException as e:
-                print(f"Error calling Mistral API: {e}")
+                print(f"Error calling API: {e}")
                 # Log more details if available in the response
                 if hasattr(e, 'response') and e.response is not None:
                     print(f"Response status code: {e.response.status_code}")
@@ -294,7 +304,7 @@ class Mistral:
 
 
     def ask(self, image_path, question):
-        """Ask a question about the image using Pixtral."""
+        """Ask a question about the image using LLM API"""
         # Ensure model is Pixtral for image input
         # if not self.model.startswith("pixtral"):
         #     print(f"Warning: Model {self.model} may not support image input. Trying anyway.")
@@ -343,13 +353,13 @@ class Mistral:
             return {"choices": [{"message": {"content": json.dumps(content)}}]} 
         else:
             try:
-                print(f"Sending request to Mistral API for image {os.path.basename(image_path)}...")
+                print(f"Sending request to LLM API for image {os.path.basename(image_path)}...")
                 response = requests.post(self.api_url, headers=headers, json=payload, timeout=60) # Added timeout
                 response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
                 print("Request successful.")
                 return response.json()
             except requests.exceptions.RequestException as e:
-                print(f"Error calling Mistral API: {e}")
+                print(f"Error calling LLM API: {e}")
                 # Log more details if available in the response
                 if hasattr(e, 'response') and e.response is not None:
                     print(f"Response status code: {e.response.status_code}")
@@ -426,7 +436,10 @@ class Mistral:
             while attempts < max_attempts_per_item and not valid_json_response:
                 attempts += 1
                 print(f"  Attempting LLM description (Attempt {attempts}/{max_attempts_per_item})")
-                response = self.ask(image_path, prompt_ts)
+                if self.image:
+                    response = self.ask(image_path, prompt_ts)
+                else:
+                    response = self.ask_noimage(prompt_ts)
 
                 if response is None or "choices" not in response or not response["choices"]:
                     print("  Error: Failed to get response from LLM or response is empty.")
@@ -618,7 +631,7 @@ if __name__ == "__main__":
     # Example (Windows PowerShell): $env:MISTRAL_API_KEY='your_api_key'
     
     # Set dryrun=False to actually call the API
-    chat = Mistral(dryrun=False) 
+    chat = Mistral(dryrun = False, image = False)
                                 
     print("\n--- Running dataset generation (first call) ---")
     for itt in range(1):
