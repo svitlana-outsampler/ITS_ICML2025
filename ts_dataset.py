@@ -6,12 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import savgol_filter
 
-
-
-np.random.seed(42)
-
 prompt_ts = r"""
-Describe the time series in three sentences. First sentence: describe trend (increasing/decreasing/flat). Second sentence: noise intensity (low/medium/high). Third sentence: approximate localisation of global maximum (beginning/middle/end) and global minimum (beginning/middle/end).
+/think Describe the time series in three sentences. First sentence: describe trend (increasing/decreasing/flat). Second sentence: noise intensity (low/medium/high). Third sentence: approximate localisation of global maximum (beginning/middle/end) and global minimum (beginning/middle/end).
 Put the description in a JSON format with the following pattern
 ```json
 { "trend": <sentence1>,
@@ -122,21 +118,6 @@ class OUProcess:
         x0 = 0.5
         X[0] = x0                     # Initial value
 
-        if slope > sigma*0.1:
-            description['trend'] = "the time series shows an overall increasing trend."
-        elif slope < -sigma*0.1:
-            description['trend'] = "the time series shows an overall decreasing trend."
-        else:
-            description['trend'] = "the time series shows no clear trend."
-
-
-        if sigma < 0.1:
-            description['noise']="the time series presents many small fluctuations."
-        elif sigma > 0.3:
-            description['noise']="the time series presents many large fluctuations."
-        else:
-            description['noise']="the time series presents many moderate fluctuations."
-
 
         # Use a fixed seed for reproducibility *within a single generation* if needed
         # np.random.seed(self.seed) # Uncomment if you want deterministic generation based on seed
@@ -157,7 +138,37 @@ class OUProcess:
         # round the values to 0 decimal places and convert to integer
         X = np.floor(X).astype(int)
 
-                # recherche de la localisation en t du maximum et du minimum
+
+        # compute the average of the solution on the 20 first points
+        average1 = np.mean(X[:20])
+        # compute the average of the solution on the 20 last points
+        average2 = np.mean(X[-20:])
+
+        # if slope > sigma*0.1:
+        #     description['trend'] = "the time series shows an overall increasing trend."
+        # elif slope < -sigma*0.1:
+        #     description['trend'] = "the time series shows an overall decreasing trend."
+        # else:
+        #     description['trend'] = "the time series shows no clear trend."
+
+
+        if average1 < average2 -3:
+            description['trend'] = "the time series shows an overall increasing trend."
+        elif average1 > average2 +3:
+            description['trend'] = "the time series shows an overall decreasing trend."
+        else:
+            description['trend'] = "the time series shows no clear trend."
+         
+
+        if sigma < 0.1:
+            description['noise']="the time series presents many small fluctuations."
+        elif sigma > 0.3:
+            description['noise']="the time series presents many large fluctuations."
+        else:
+            description['noise']="the time series presents many moderate fluctuations."
+
+
+        # recherche de la localisation en t du maximum et du minimum
         pos_max = np.argmax(X)
         print('pos_max', pos_max)
         if pos_max < 32:
@@ -220,8 +231,8 @@ class Mistral:
                 raise ValueError("MISTRAL_API_KEY environment variable not set.")
             self.api_url = "https://api.mistral.ai/v1/chat/completions"
             #self.model = "mistral-large-latest" # Using the recommended model for function calling / JSON mode
-            #self.model = "pixtral-large-latest"
-            self.model = "pixtral-12b-2409"
+            self.model = "pixtral-large-latest"
+            #self.model = "pixtral-12b-2409"
             #self.model = "pixtral-large-latest" # Use pixtral if image input is definitely needed later
             print("Mistral initialized")
         else:
@@ -229,6 +240,7 @@ class Mistral:
             if not self.api_key and not dryrun:
                 raise ValueError("TEXTSYNTH_API_KEY environment variable not set.")
             self.api_url = "https://palgania.ovh:8106/v1/chat/completions"
+            self.api_url = "http://0.0.0.0:8080/v1/chat/completions"
             self.model = "qwen3-30b-a3b" # Using the recommended model for function calling / JSON mode
             print("Palgania initialized")
 
@@ -371,6 +383,50 @@ class Mistral:
             except Exception as e: # Catch any other unexpected errors
                 print(f"An unexpected error occurred during API call: {e}")
                 return None
+            
+    def load_dataset(self):
+        directory = "dataset"
+        json_file_path = os.path.join(directory, "data.jsonl")  # Change to data.jsonl
+
+        # Ensure the directory exists
+        os.makedirs(directory, exist_ok=True)
+
+        # --- CHANGE 1: Load existing data ---
+        self.data_json = []
+        start_index = 0
+        if os.path.exists(json_file_path):
+            try:
+                with open(json_file_path, "r") as f:
+                    self.data_json = []
+                    for line in f:
+                        try:
+                            entry = json.loads(line)
+                            self.data_json.append(entry)
+                        except json.JSONDecodeError as e:
+                            print(f"Warning: Could not decode JSON from line: {line}. Error: {e}")
+                    # Ensure data_json is a list
+                    if not isinstance(self.data_json, list):
+                        print(f"Warning: {json_file_path} does not contain valid JSON lines. Starting fresh.")
+                        self.data_json = []
+                    else:
+                        # --- CHANGE 2: Calculate starting index ---
+                        start_index = len(self.data_json)
+                        print(f"Loaded {start_index} existing entries from {json_file_path}.")
+            except json.JSONDecodeError:
+                print(f"Warning: Could not decode JSON from {json_file_path}. Starting fresh.")
+                self.data_json = []
+            except Exception as e:
+                print(f"Warning: Error reading {json_file_path}: {e}. Starting fresh.")
+                self.data_json = []
+        else:
+            print(f"{json_file_path} not found. Creating a new dataset.")
+
+    # recompute the truth 
+    def redo_truth(self):
+        self.load_dataset()
+        np.random
+        for i in range(len(self.data_json)):
+            params = self.data_json[i]["parameters"]
 
     # generate a dataset of time series, images and description
     # the series, images and description are stored in the dataset directory
@@ -379,36 +435,9 @@ class Mistral:
     # the series is a list of floats, the image is a string containing the path to the image
     # and the description is a string
     def dataset(self, n):
+        self.load_dataset()  # Load existing dataset if any
+        start_index = len(self.data_json)
         directory = "dataset"
-        json_file_path = os.path.join(directory, "data.jsonl")  # Change to data.jsonl
-
-        # Ensure the directory exists
-        os.makedirs(directory, exist_ok=True)
-
-        # --- CHANGE 1: Load existing data ---
-        data_json = []
-        start_index = 0
-        if os.path.exists(json_file_path):
-            try:
-                with open(json_file_path, "r") as f:
-                    data_json = json.load(f)
-                    # Ensure data_json is a list
-                    if not isinstance(data_json, list):
-                        print(f"Warning: {json_file_path} does not contain a JSON list. Starting fresh.")
-                        data_json = []
-                    else:
-                        # --- CHANGE 2: Calculate starting index ---
-                        start_index = len(data_json)
-                        print(f"Loaded {start_index} existing entries from {json_file_path}.")
-            except json.JSONDecodeError:
-                print(f"Warning: Could not decode JSON from {json_file_path}. Starting fresh.")
-                data_json = []
-            except Exception as e:
-                print(f"Warning: Error reading {json_file_path}: {e}. Starting fresh.")
-                data_json = []
-        else:
-            print(f"{json_file_path} not found. Creating a new dataset.")
-
         # --- Generation Loop ---
         generated_count = 0
         max_attempts_per_item = 3  # Add a limit to retry attempts for JSON validation
@@ -447,6 +476,10 @@ class Mistral:
 
                 raw_json_string = response["choices"][0]["message"]["content"]
                 print(f"  Raw LLM response: {raw_json_string}")
+                # remove the think block 
+                raw_json_string = re.sub(r'<think>.*?</think>', '', raw_json_string, flags=re.DOTALL)
+                raw_json_string = raw_json_string.strip()
+
 
                 # Save the raw response text regardless of validity for debugging
                 try:
@@ -468,7 +501,7 @@ class Mistral:
                         description_json = json.loads(cleaned_json_string)
                         ts_list = ts.tolist()
 
-                        data_json.append({
+                        self.data_json.append({
                             "index": current_index,
                             "question": prompt_ts,
                             "series": ts_list,
@@ -492,11 +525,11 @@ class Mistral:
         # --- CHANGE 4: Save the combined data as JSON Lines ---
         try:
             with open(json_file_path, "w") as f:
-                for entry in data_json:
+                for entry in self.data_json:
                     json.dump(entry, f)
                     f.write('\n')
             print(f"\nSuccessfully generated {generated_count} new entries.")
-            print(f"Total entries in {json_file_path}: {len(data_json)}")
+            print(f"Total entries in {json_file_path}: {len(self.data_json)}")
         except IOError as e:
             print(f"\nError: Could not write updated dataset to {json_file_path}: {e}")
         except TypeError as e:
@@ -504,26 +537,14 @@ class Mistral:
 
     def curate_dataset(self):
         """Curate the dataset by generating new entries and saving them as JSON Lines."""
-        directory = "dataset"
-        json_file_path = os.path.join(directory, "data.jsonl")  # Change to data.jsonl
-        # load the jsonl file
-        data_json = []
-        try:
-            with open(json_file_path, "r") as f:
-                for line in f:
-                    data_json.append(json.loads(line))
-        except IOError as e:
-            print(f"\nError: Could not read dataset from {json_file_path}: {e}")
-            return
-        except json.JSONDecodeError as e:
-            print(f"\nError: Could not decode JSON from {json_file_path}: {e}")
-            return
-        
+        self.load_dataset()        
         index_to_remove = []
 
+        errors = [0,0,0]
+
         # for each entry compute NLI score
-        for i, entry in enumerate(data_json):
-            print(f"\nProcessing entry {i}/{len(data_json)-1}")
+        for i, entry in enumerate(self.data_json):
+            print(f"\nProcessing entry {i}/{len(self.data_json)-1}")
             description = entry["description"]
             # extract the trend
             trend = description["trend"]
@@ -556,6 +577,14 @@ class Mistral:
             # of one of the scores is 'no' 
             if score_trend[0] == 'no' or score_noise[0] == 'no' or score_extrema[0] == 'no':
                 index_to_remove.append(i)
+                if score_trend[0] == 'no':
+                    errors[0] += 1
+                if score_noise[0] == 'no':
+                    errors[1] += 1
+                if score_extrema[0] == 'no':
+                    errors[2] += 1
+        print("errors", errors, "/", len(self.data_json))
+
         print("index_to_remove", index_to_remove)
         
 
@@ -582,7 +611,7 @@ def ask_noimage(question):
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": question}
+                    {"type": "text", "text": question + " /think"}
                 ]
             }
         ],
@@ -599,6 +628,10 @@ def ask_noimage(question):
         # Extract and return plain text response from LLM
         data = response.json()
         answer = data['choices'][0]['message']['content']
+        # remove the data in the think region
+        print(f"LLM response: {answer}")
+        answer = re.sub(r'<think>.*?</think>', '', answer, flags=re.DOTALL)
+        answer = answer.strip()
 
     except requests.exceptions.RequestException as e:
         print(f"Error calling Palgania API: {e}")
@@ -631,11 +664,11 @@ if __name__ == "__main__":
     # Example (Windows PowerShell): $env:MISTRAL_API_KEY='your_api_key'
     
     # Set dryrun=False to actually call the API
-    chat = Mistral(dryrun = False, image = False)
+    chat = Mistral(dryrun = False, image = True)
                                 
     print("\n--- Running dataset generation (first call) ---")
-    for itt in range(1):
-        chat.dataset(10) 
+    # for itt in range(4):
+    #     chat.dataset(25) 
 
     print("\n--- Running dataset generation (second call) ---")
     #chat.dataset(15) # Generate 2 *more* samples (total should be 5)
@@ -647,13 +680,13 @@ if __name__ == "__main__":
     print("\n--- Curating complete ---")
 
     # Optional: Verify the final JSON file content
-    json_file_path = os.path.join("dataset", "data.json")
+    json_file_path = os.path.join("dataset", "data.jsonl")
     if os.path.exists(json_file_path):
         try:
             with open(json_file_path, "r") as f:
-                final_data = json.load(f)
+                final_data = [json.loads(line) for line in f]
                 print(f"Final number of entries in {json_file_path}: {len(final_data)}")
                 # print("First entry:", json.dumps(final_data[0], indent=2) if final_data else "None")
                 # print("Last entry:", json.dumps(final_data[-1], indent=2) if final_data else "None")
         except Exception as e:
-            print(f"Could not read or parse final JSON file: {e}")
+            print(f"Could not read or parse final jsonl file: {e}")

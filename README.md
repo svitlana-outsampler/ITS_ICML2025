@@ -1,12 +1,17 @@
 # todo
-- [ ] add the ids in the metric json files
+- [x ] add the ids in the metric json files
 - [x] modify the mistral.py script for appending generated data to data.json (instead of erasing it)
-- [] launch it for generating 1000 samples
-- [x] change the number presentation with scaling and rounding (1.23456 -> 1 2 3) 
+- [x] change the number presentation with scaling and rounding (1.23456 -> 12) 
 - [x] adapt the convert.py script for computing diagnostics on each of the three sentences: cosines + llm evaluation (thus four metrics)
 - [x] check the dataset against another model (Qwen3 30b)
-- [] train on 4 epochs and 1000 samples
 - [x] discuss results
+- [] modify OU class for separating random paramters generation and time series generation
+- [] add time series paramaters to the data.jsonl file
+- [] program the possibility to recompute the "ground truth" without regenerating the data
+- [] curate: detect wrong extrema and replace by ground truth
+- [] adjust the ground truth until around 10% of samples has to be verified
+- [] train
+- [] evaluate
 - [] train a model with images (not numbers)
  
 
