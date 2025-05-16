@@ -78,11 +78,16 @@ def detect_contradiction_nli(premise, hypothesis):
     max_idx = torch.argmax(probs).item()
     return labels[max_idx], probs[0][max_idx].item()
 
+# generate the description of a time series without calling the LLM
+def generate_description(X):
+    n = len(X)
+    
+
 # a small class for generating Orstein Uhlenbeck process together with an automatic
 # human readible description of the process
 class OUProcess:
     def __init__(self):
-        self.seed = 0
+        #self.seed = 0
         # give the seed to numpy
         self.T=1000          # Time horizon
         self.dt=0.1         # Time step
@@ -157,7 +162,7 @@ class OUProcess:
         elif average1 > average2 +3:
             description['trend'] = "the time series shows an overall decreasing trend."
         else:
-            description['trend'] = "the time series shows no clear trend."
+            description['trend'] = "the time series shows no uniformly increasing or decreasing trend."
          
 
         if sigma < 0.1:
@@ -420,13 +425,48 @@ class Mistral:
                 self.data_json = []
         else:
             print(f"{json_file_path} not found. Creating a new dataset.")
+            # just create an empty file
+            with open(json_file_path, 'w') as file:
+                pass
+
+    def save_dataset(self):
+        directory = "dataset"
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        json_file_path = os.path.join(directory, 'data2.jsonl')
+        with open(json_file_path, 'w') as file:
+            for entry in self.data_json:
+                file.write(json.dumps(entry) + '\n')
 
     # recompute the truth 
     def redo_truth(self):
         self.load_dataset()
         np.random
         for i in range(len(self.data_json)):
-            params = self.data_json[i]["parameters"]
+            X = np.array(self.data_json[i]["series"])
+            x = np.arange(len(X))
+            coeffs = np.polyfit(x, X, deg=3)
+            P = np.poly1d(coeffs)
+            X_fit = P(x)
+            # compute the l2 norm of the difference
+            l2_norm = np.linalg.norm(X - X_fit)/np.sqrt(len(X))
+            # plt.plot(x,X)
+            # plt.plot(x,X_fit)
+            # plt.show()
+            Pp = P.deriv()
+            Xp_fit = Pp(x)
+            divmin = np.min(Xp_fit)
+            divmax = np.max(Xp_fit)
+            if divmin > 0:
+                sentence =  "the time series presents an overall increasing trend"
+            elif divmax < 0:
+                sentence = "the time series presents an overall decreasing trend"
+            else:
+                sentence = "the time series presents no uniformly increasing or decreasing trend"
+            self.data_json[i]["truth_description"]["trend"] = sentence
+            print(f"l2 norm of the difference: {l2_norm}")
+            
+
 
     # generate a dataset of time series, images and description
     # the series, images and description are stored in the dataset directory
@@ -523,6 +563,8 @@ class Mistral:
                         print(f"  Error: Max attempts reached for index {current_index}. Skipping this entry.")
 
         # --- CHANGE 4: Save the combined data as JSON Lines ---
+        directory = "dataset"
+        json_file_path = os.path.join(directory, "data.jsonl")
         try:
             with open(json_file_path, "w") as f:
                 for entry in self.data_json:
@@ -583,9 +625,11 @@ class Mistral:
                     errors[1] += 1
                 if score_extrema[0] == 'no':
                     errors[2] += 1
+                    self.data_json[i]['description']['extrema']= self.data_json[i]['truth_description']['extrema']
         print("errors", errors, "/", len(self.data_json))
 
-        print("index_to_remove", index_to_remove)
+        print("index_to_check", index_to_remove)
+        self.save_dataset()
         
 
 
@@ -667,7 +711,7 @@ if __name__ == "__main__":
     chat = Mistral(dryrun = False, image = True)
                                 
     print("\n--- Running dataset generation (first call) ---")
-    # for itt in range(4):
+    # for itt in range(7):
     #     chat.dataset(25) 
 
     print("\n--- Running dataset generation (second call) ---")
@@ -678,6 +722,12 @@ if __name__ == "__main__":
     print("\n--- Curate the dataset ---")
     chat.curate_dataset()
     print("\n--- Curating complete ---")
+
+    # chat.redo_truth()
+    print("\n--- Redo truth complete ---")
+
+    # chat.save_dataset()
+    print("\n--- Dataset saved ---")
 
     # Optional: Verify the final JSON file content
     json_file_path = os.path.join("dataset", "data.jsonl")
