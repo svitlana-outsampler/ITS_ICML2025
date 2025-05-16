@@ -66,6 +66,14 @@ The values and text are also stored in a json file `data.json`.
 
 The pixtral model is queried with both images and numerical data. If only numerical data are provided to the large Mistral model, the results are not good at all.
 
+## Data curation
+
+I test several "truth" sentences to compare with. Surprisingly the most difficult  part is to find truth about the trend that agrees with the LLM. In practice the LLM gives very good description and the NLI score detects a lot of false errors (25%) that are almost all irrelevant. For the noise it is ok, the ambiguity is sufficient so that the sentences do not contradict. For the extrema description, it was also easy: if the NLI score is bad, I simply replace in the dataset the LLM sentence by the hand made generated description. 
+
+On the trend description, the NLI approach detect 61 contradictions for 225 samples. Most of them are irrelevant. There are some edge cases (less than 2%) that can be kept because even if the description is not perfect it cannot be considered as completely false.
+On the noise description, the NLI approach detect 6 contradictions for 225 samples, which can be ignored.
+On the extrema description, the NLI approach detect 10 contradictions for 225 samples. These are true contradictions. They are fixed so that in the end there is no contradiction in the extrema description.
+
 ## Training the model
 
 First convert the dataset to a format that can be used by the training script. This is done by the script `convert.py` that creates a single file `test_jsonl.jsonl` containing  a list of pairs of reference prompt/answers.

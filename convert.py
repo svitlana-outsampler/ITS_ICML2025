@@ -2,14 +2,14 @@ import json
 
 def convert_dataset_to_jsonl(input_path, output_path, truncate_series=1000):
     """
-    Convertit un dataset au format json en un jsonl input/output pour le fine-tuning LoRA.
+    Convertit un dataset au format jsonl en un jsonl input/output pour le fine-tuning LoRA.
     
-    :param input_path: chemin vers le fichier JSON d'origine.
+    :param input_path: chemin vers le fichier JSONL d'origine.
     :param output_path: chemin où sauvegarder le fichier JSONL transformé.
     :param truncate_series: nombre maximal de points de la série à inclure (pour éviter des inputs trop longs).
     """
     with open(input_path, 'r') as f:
-        data = json.load(f)
+        data = [json.loads(line) for line in f]
 
     with open(output_path, 'w') as out_file:
         print("found ", len(data), " examples")
@@ -32,4 +32,4 @@ def convert_dataset_to_jsonl(input_path, output_path, truncate_series=1000):
     print(f"Conversion terminée : {output_path}")
 
 # Exemple d'utilisation
-convert_dataset_to_jsonl('dataset/data.json', 'test_jsonl.jsonl')
+convert_dataset_to_jsonl('dataset/data.jsonl', 'test_jsonl.jsonl', truncate_series=200)
