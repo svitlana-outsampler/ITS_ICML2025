@@ -7,7 +7,7 @@ from sklearn.metrics.pairwise import euclidean_distances
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import os
 
-from mistral import ask_noimage
+from ts_dataset import ask_noimage
 
 
 # test the function ask_noimage
@@ -144,10 +144,12 @@ def plot_and_save(i):
 
 
     fig, axs = plt.subplots(1+3, 1, figsize=(10, 12))
+    axs[0].set_ylim(0, 99)
     axs[0].plot(series)
     axs[0].set_xlabel('Time')
     axs[0].set_ylabel('Value')
     axs[0].set_title('Time Series')
+
 
     for iss in range(len(sentence_gold)):
         axs[1+iss].axis('off')

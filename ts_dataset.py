@@ -89,10 +89,8 @@ class OUProcess:
     def __init__(self):
         #self.seed = 0
         # give the seed to numpy
-        self.T=1000          # Time horizon
-        self.dt=0.1         # Time step
         self.theta=0.7      # Speed of mean reversion: higher values pull X(t) faster towards the mean
-        self.slope = 0.0    # Slope of the mean curve
+        #self.slope = 0.0    # Slope of the mean curve
         self.mu=0.0         # Long-term mean: the value to which the process tends to revert
         self.sigma=0.      # Volatility: the intensity of the random fluctuations (Brownian motion component)
         self.x0=0.0         # Initial value of the process
@@ -117,10 +115,10 @@ class OUProcess:
         mu = self.mu + np.random.uniform(-1,1)*2
         mu = 0.5
         sigma = self.sigma + np.random.uniform(0., 0.4)
-        slope = self.slope+ np.random.uniform(-1,1)*0.25
+        #slope = self.slope+ np.random.uniform(-1,1)*0.25
         #sigma = 0 # Keep this commented unless you specifically want no noise
-        #x0 = self.x0 + np.random.uniform(-1,1)*2
-        x0 = 0.5
+        x0 = self.x0 + np.random.uniform(-1,1)*2
+        #x0 = 0.5
         X[0] = x0                     # Initial value
 
 
@@ -129,17 +127,17 @@ class OUProcess:
         
         for i in range(1, N):
             dW = np.random.normal(0, np.sqrt(self.dt))  # Brownian increment
-            #X[i] = X[i-1] + theta * (mu - X[i-1]) * self.dt + sigma * dW
-            X[i] = X[i-1] + slope * self.dt + sigma * dW
+            X[i] = X[i-1] + theta * (mu - X[i-1]) * self.dt + sigma * dW
+            #X[i] = X[i-1] + slope * self.dt + sigma * dW
             # remet X dans l'intervalle [0,1]
-            X[i] = np.clip(X[i], 0, 1)
+            #X[i] = np.clip(X[i], 0, 1)
         
         # get the max of the sequence
-        #max_value = np.max(X)
+        max_value = np.max(X)
         # get the min of the sequence
-        #min_value = np.min(X)
+        min_value = np.min(X)
         # scale the sequence so that all the values are between 0 and 99.9999
-        X = X * 99.9999
+        X = (X - min_value) / (max_value - min_value) * 99.9999
         # round the values to 0 decimal places and convert to integer
         X = np.floor(X).astype(int)
 
@@ -193,7 +191,7 @@ class OUProcess:
             pos_desc += " and the minimum is reached around the middle of the time series."
 
         description['extrema'] = pos_desc
-        description['parameters'] = "sigma="+str(sigma) + " mu=" + str(mu) + " x0=" + str(x0) + " slope=" + str(slope)
+        description['parameters'] = "sigma="+str(sigma) + " mu=" + str(mu) + " x0=" + str(x0) + " theta=" + str(theta)
 
         # convert to a json string
         description = json.dumps(description)
@@ -236,8 +234,8 @@ class Mistral:
                 raise ValueError("MISTRAL_API_KEY environment variable not set.")
             self.api_url = "https://api.mistral.ai/v1/chat/completions"
             #self.model = "mistral-large-latest" # Using the recommended model for function calling / JSON mode
-            self.model = "pixtral-large-latest"
-            #self.model = "pixtral-12b-2409"
+            #self.model = "pixtral-large-latest"
+            self.model = "pixtral-12b-2409"
             #self.model = "pixtral-large-latest" # Use pixtral if image input is definitely needed later
             print("Mistral initialized")
         else:
@@ -711,8 +709,8 @@ if __name__ == "__main__":
     chat = Mistral(dryrun = False, image = True)
                                 
     print("\n--- Running dataset generation (first call) ---")
-    # for itt in range(7):
-    #     chat.dataset(25) 
+    for itt in range(2):
+        chat.dataset(5) 
 
     print("\n--- Running dataset generation (second call) ---")
     #chat.dataset(15) # Generate 2 *more* samples (total should be 5)
