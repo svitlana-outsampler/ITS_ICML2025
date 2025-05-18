@@ -6,6 +6,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import euclidean_distances
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import os
+import numpy as np
 
 from ts_dataset import ask_noimage
 
@@ -88,6 +89,77 @@ with open(file_name, 'r') as f:
 
 # assert len(evaluation_avant) == len(evaluation_apres), "Files do not have the same number of entries."
 
+# recompute the truth 
+def ask_truth(X):
+    x = np.arange(len(X))
+    coeffs = np.polyfit(x, X, deg=3)
+    P = np.poly1d(coeffs)
+    X_fit = P(x)
+    # compute the l2 norm of the difference
+    l2_norm = np.linalg.norm(X - X_fit)/np.sqrt(len(X))
+    # plt.plot(x,X)
+    # plt.plot(x,X_fit)
+    # plt.show()
+    Pp = P.deriv()
+    Xp_fit = Pp(x)
+    delta = Xp_fit[-1] - Xp_fit[0]
+    # divmin = np.min(Xp_fit)
+    # divmax = np.max(Xp_fit)
+    # if divmin > 0:
+    #     sentence =  "the time series presents an overall increasing trend"
+    # elif divmax < 0:
+    #     sentence = "the time series presents an overall decreasing trend"
+    # else:
+    #     sentence = "the time series presents no uniformly increasing or decreasing trend"
+    # if delta > 5:
+    #     sentence =  "the time series presents an overall increasing trend"
+    # elif delta < -5:
+    #     sentence = "the time series presents an overall decreasing trend"
+    # else:
+    #     sentence = "the time series presents no uniformly increasing or decreasing trend"
+    # compute the average of the solution on the 20 first points
+    average1 = np.mean(X[:20])
+    # compute the average of the solution on the 20 last points
+    average2 = np.mean(X[-20:])
+    if average1 < average2 -3:
+        sentence_trend = "the time series shows an overall increasing trend."
+    elif average1 > average2 +3:
+        sentence_trend = "the time series shows an overall decreasing trend."
+    else:
+        sentence_trend = "the time series shows no uniformly increasing or decreasing trend."
+
+    print(f"L2 norm of the difference: {l2_norm}")
+    #sentence_noise = self.data_json[i]["description"]["noise"]
+    if l2_norm < 2:
+        sentence_noise = "the noise intensity is low"
+    elif l2_norm > 12:
+        sentence_noise = "the noise intensity is high"
+    else:
+        sentence_noise = "the noise intensity is medium"
+    # print(sentence_noise)
+    # self.data_json[i]["truth_description"]["noise"] = sentence_noise
+    # recherche de la localisation en t du maximum et du minimum
+    pos_max = np.argmax(X)
+    print('pos_max', pos_max)
+    if pos_max < 32:
+        sentence_extrema = "The maximum is reached around the beginning part of the time series"
+    elif pos_max > 96:
+        sentence_extrema = "The maximum is reached towards the end of the time series"
+    else:
+        sentence_extrema = "The maximum is reached around the middle of the time series"
+
+    pos_min = np.argmin(X)
+    print('pos_min', pos_min)
+    if pos_min < 32:
+        sentence_extrema += " and the minimum is reached around the beginning part of the time series."
+    elif pos_min > 96:
+        sentence_extrema += " and the minimum is reached towards the end of the time series."
+    else:
+        sentence_extrema += " and the minimum is reached around the middle of the time series."
+
+    return (sentence_trend, sentence_noise, sentence_extrema)
+
+
 import ast 
 import re
 def plot_and_save(i):
@@ -95,6 +167,12 @@ def plot_and_save(i):
     series_str = input_data.split('Series: ')[1].strip()
     series_str = re.sub(r'\b0+(\d)', r'\1', series_str)
     series = ast.literal_eval(series_str)
+
+
+    truth_trend, truth_noise, truth_extrema = ask_truth(series)
+    print("truth_trend: ", truth_trend)
+    print("truth_noise: ", truth_noise)
+    print("truth_extrema: ", truth_extrema)
     #series = json.loads(input_data.split('Series: ')[1])
     #exit()
     gold_output = evaluation_apres[i]['gold_output']
@@ -102,6 +180,10 @@ def plot_and_save(i):
     # cute the string to the first 600 characters
     # diagnostic_avant = diagnostic_avant[:600]
     diagnostic_apres = evaluation_apres[i]['generated_output']
+    print("diagnostic_apres: ", diagnostic_apres)
+    # in this string keep the string that is between { }
+    diagnostic_apres = diagnostic_apres[diagnostic_apres.find('{'):diagnostic_apres.rfind('}')+1]
+    print("diagnostic_apres: ", diagnostic_apres)
 
     sentence_gold = []
     sentence_after = []
@@ -112,13 +194,19 @@ def plot_and_save(i):
     sentence_gold.append(json_gold['noise'])
     sentence_gold.append(json_gold['extrema'])
 
+    sentence_gold = [truth_trend, truth_noise, truth_extrema]
+
     try:
         json_after = json.loads(diagnostic_apres)
+        print("json_after: ", json_after)
         sentence_after.append(json_after['trend'])
         sentence_after.append(json_after['noise'])
         sentence_after.append(json_after['extrema'])
+        print("sentence_after: ", sentence_after)
     except (json.JSONDecodeError, KeyError):
         sentence_after.extend([""] * 3)
+
+    print("sentence_after: ", sentence_after)
 
 
     # Compute similarity scores for each sentence

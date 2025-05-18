@@ -218,6 +218,77 @@ class OUProcess:
         plt.close() # Close the plot to free memory
         return X, description
 
+# recompute the truth 
+def ask_truth(X):
+    x = np.arange(len(X))
+    coeffs = np.polyfit(x, X, deg=3)
+    P = np.poly1d(coeffs)
+    X_fit = P(x)
+    # compute the l2 norm of the difference
+    l2_norm = np.linalg.norm(X - X_fit)/np.sqrt(len(X))
+    # plt.plot(x,X)
+    # plt.plot(x,X_fit)
+    # plt.show()
+    Pp = P.deriv()
+    Xp_fit = Pp(x)
+    delta = Xp_fit[-1] - Xp_fit[0]
+    # divmin = np.min(Xp_fit)
+    # divmax = np.max(Xp_fit)
+    # if divmin > 0:
+    #     sentence =  "the time series presents an overall increasing trend"
+    # elif divmax < 0:
+    #     sentence = "the time series presents an overall decreasing trend"
+    # else:
+    #     sentence = "the time series presents no uniformly increasing or decreasing trend"
+    # if delta > 5:
+    #     sentence =  "the time series presents an overall increasing trend"
+    # elif delta < -5:
+    #     sentence = "the time series presents an overall decreasing trend"
+    # else:
+    #     sentence = "the time series presents no uniformly increasing or decreasing trend"
+    # compute the average of the solution on the 20 first points
+    average1 = np.mean(X[:20])
+    # compute the average of the solution on the 20 last points
+    average2 = np.mean(X[-20:])
+    if average1 < average2 -3:
+        sentence_trend = "the time series shows an overall increasing trend."
+    elif average1 > average2 +3:
+        sentence_trend = "the time series shows an overall decreasing trend."
+    else:
+        sentence_trend = "the time series shows no uniformly increasing or decreasing trend."
+
+    print(f"L2 norm of the difference: {l2_norm}")
+    #sentence_noise = self.data_json[i]["description"]["noise"]
+    if l2_norm < 2:
+        sentence_noise = "the noise intensity is low"
+    elif l2_norm > 12:
+        sentence_noise = "the noise intensity is high"
+    else:
+        sentence_noise = "the noise intensity is medium"
+    # print(sentence_noise)
+    # self.data_json[i]["truth_description"]["noise"] = sentence_noise
+    # recherche de la localisation en t du maximum et du minimum
+    pos_max = np.argmax(X)
+    print('pos_max', pos_max)
+    if pos_max < 32:
+        sentence_extrema = "The maximum is reached around the beginning part of the time series"
+    elif pos_max > 96:
+        sentence_extrema = "The maximum is reached towards the end of the time series"
+    else:
+        sentence_extrema = "The maximum is reached around the middle of the time series"
+
+    pos_min = np.argmin(X)
+    print('pos_min', pos_min)
+    if pos_min < 32:
+        sentence_extrema += " and the minimum is reached around the beginning part of the time series."
+    elif pos_min > 96:
+        sentence_extrema += " and the minimum is reached towards the end of the time series."
+    else:
+        sentence_extrema += " and the minimum is reached around the middle of the time series."
+
+    return (sentence_trend, sentence_noise, sentence_extrema)
+
+
 # définir les modèles: pixtral, mistral, qwen, nollm (génération de phrases factuelles)
 # appeler ask ou ask noimage en fonction du modèle
 # fact checker 
@@ -234,8 +305,8 @@ class Mistral:
                 raise ValueError("MISTRAL_API_KEY environment variable not set.")
             self.api_url = "https://api.mistral.ai/v1/chat/completions"
             #self.model = "mistral-large-latest" # Using the recommended model for function calling / JSON mode
-            #self.model = "pixtral-large-latest"
-            self.model = "pixtral-12b-2409"
+            self.model = "pixtral-large-latest"
+            #self.model = "pixtral-12b-2409"
             #self.model = "pixtral-large-latest" # Use pixtral if image input is definitely needed later
             print("Mistral initialized")
         else:
@@ -453,16 +524,45 @@ class Mistral:
             # plt.show()
             Pp = P.deriv()
             Xp_fit = Pp(x)
-            divmin = np.min(Xp_fit)
-            divmax = np.max(Xp_fit)
-            if divmin > 0:
-                sentence =  "the time series presents an overall increasing trend"
-            elif divmax < 0:
-                sentence = "the time series presents an overall decreasing trend"
+            delta = Xp_fit[-1] - Xp_fit[0]
+            # divmin = np.min(Xp_fit)
+            # divmax = np.max(Xp_fit)
+            # if divmin > 0:
+            #     sentence =  "the time series presents an overall increasing trend"
+            # elif divmax < 0:
+            #     sentence = "the time series presents an overall decreasing trend"
+            # else:
+            #     sentence = "the time series presents no uniformly increasing or decreasing trend"
+            # if delta > 5:
+            #     sentence =  "the time series presents an overall increasing trend"
+            # elif delta < -5:
+            #     sentence = "the time series presents an overall decreasing trend"
+            # else:
+            #     sentence = "the time series presents no uniformly increasing or decreasing trend"
+            # compute the average of the solution on the 20 first points
+            average1 = np.mean(X[:20])
+            # compute the average of the solution on the 20 last points
+            average2 = np.mean(X[-20:])
+            if average1 < average2 -3:
+                sentence = "the time series shows an overall increasing trend."
+            elif average1 > average2 +3:
+                sentence = "the time series shows an overall decreasing trend."
             else:
-                sentence = "the time series presents no uniformly increasing or decreasing trend"
+                sentence = "the time series shows no uniformly increasing or decreasing trend."
             self.data_json[i]["truth_description"]["trend"] = sentence
-            print(f"l2 norm of the difference: {l2_norm}")
+
+            print(f"{i} L2 norm of the difference: {l2_norm}")
+            #sentence_noise = self.data_json[i]["description"]["noise"]
+            if l2_norm < 2:
+                sentence_noise = "the noise intensity is low"
+            elif l2_norm > 12:
+                sentence_noise = "the noise intensity is high"
+            else:
+                sentence_noise = "the noise intensity is medium"
+            print(sentence_noise)
+            self.data_json[i]["truth_description"]["noise"] = sentence_noise
+        self.save_dataset()
+
             
 
 
@@ -623,7 +723,8 @@ class Mistral:
                     errors[1] += 1
                 if score_extrema[0] == 'no':
                     errors[2] += 1
-                    self.data_json[i]['description']['extrema']= self.data_json[i]['truth_description']['extrema']
+                    self.data_json[i]["description"]["extrema"]= self.data_json[i]["truth_description"]["extrema"]
+
         print("errors", errors, "/", len(self.data_json))
 
         print("index_to_check", index_to_remove)
@@ -709,8 +810,8 @@ if __name__ == "__main__":
     chat = Mistral(dryrun = False, image = True)
                                 
     print("\n--- Running dataset generation (first call) ---")
-    for itt in range(2):
-        chat.dataset(5) 
+    # for itt in range(11):
+    #     chat.dataset(20) 
 
     print("\n--- Running dataset generation (second call) ---")
     #chat.dataset(15) # Generate 2 *more* samples (total should be 5)
@@ -721,10 +822,10 @@ if __name__ == "__main__":
     chat.curate_dataset()
     print("\n--- Curating complete ---")
 
-    # chat.redo_truth()
+    #chat.redo_truth()
     print("\n--- Redo truth complete ---")
 
-    # chat.save_dataset()
+    #chat.save_dataset()
     print("\n--- Dataset saved ---")
 
     # Optional: Verify the final JSON file content

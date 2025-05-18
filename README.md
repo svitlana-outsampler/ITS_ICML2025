@@ -68,11 +68,11 @@ The pixtral model is queried with both images and numerical data. If only numeri
 
 ## Data curation
 
-I test several "truth" sentences to compare with. Surprisingly the most difficult  part is to find truth about the trend that agrees with the LLM. In practice the LLM gives very good description and the NLI score detects a lot of false errors (25%) that are almost all irrelevant. For the noise it is ok, the ambiguity is sufficient so that the sentences do not contradict. For the extrema description, it was also easy: if the NLI score is bad, I simply replace in the dataset the LLM sentence by the hand made generated description. 
+I test several "truth" sentences to compare with. Surprisingly a difficult task is to find truth about the trend that agrees with the LLM. In practice the LLM gives good description and the NLI score detects errors (for around 7% of the samples) that are almost all irrelevant. For the noise it is ok, the ambiguity is sufficient so that the sentences do not contradict. For the extrema description, it was also easy: if the NLI score is bad (4% of the samples), I simply replace in the dataset the LLM sentence by the hand made generated description. 
 
-On the trend description, the NLI approach detect 61 contradictions for 225 samples. Most of them are irrelevant. There are some edge cases (less than 2%) that can be kept because even if the description is not perfect it cannot be considered as completely false.
-On the noise description, the NLI approach detect 6 contradictions for 225 samples, which can be ignored.
-On the extrema description, the NLI approach detect 10 contradictions for 225 samples. These are true contradictions. They are fixed so that in the end there is no contradiction in the extrema description.
+On the trend description, the NLI approach detect 15 contradictions for 220 samples. Most of them are irrelevant. There are some edge cases (less than 2%) that can be kept because even if the description is not perfect it cannot be considered as completely false.
+On the noise description, the NLI approach detect 28 contradictions for 220 samples, which can be ignored.
+On the extrema description, the NLI approach detect 10 contradictions for 220 samples. These are true contradictions. They are fixed so that in the end there is no contradiction in the extrema description.
 
 ## Training the model
 
@@ -119,7 +119,7 @@ Inference: TO DO
 
 ## Results
 
-In order to generate the dataset, we first synthetically generate 200-1000 time series of an Orstein-Uhlenbeck process with 128 samples each. The values are rescaled betwenn 0 and 99 and rounded to nearest integer. This is done for improving the LLM understanding of the time series. It is known that too much digit precision can be confusing for the LLM.
+In order to generate the dataset, we first synthetically generate 220 time series of an Orstein-Uhlenbeck process with 128 samples each. The values are rescaled between 0 and 99 and rounded to nearest integer. This is done for improving the LLM understanding of the time series. It is known that too much digit precision can be confusing for the LLM.
 The Python function for generating one time series is the following:
 ```python
 def generate(self, imagename="ou_process.png", filename="ou_process.dat"):
@@ -127,11 +127,13 @@ def generate(self, imagename="ou_process.png", filename="ou_process.dat"):
 ```
 Then the synthetic time series are analyzed with the model "mistral-large-latest" from Mistral AI (https://mistral.ai/) (May 2025).  The prompt used for the analysis is the following:
 ```
-Describe the time series in three sentences. First sentence: describe increasing/decreasing/flat trend. Second sentence: possible presence and intensity of noise. Third sentence: describe local and global extrema.\nPut the description in a JSON format with the following pattern\n{ \"trend\": <sentence1>,\n  \"noise\": <sentence2>,\n  \"extrema\": <sentence3> }.\n Series: [00, 01, 02, 03, 04, 04, 06, ... <rest of the series>...]
+/think Describe the time series in three sentences. First sentence: describe trend (increasing/decreasing/flat). Second sentence: noise intensity (low/medium/high). Third sentence: approximate localisation of global maximum (beginning/middle/end) and global minimum (beginning/middle/end).
+Put the description in a JSON format with the following pattern
+{ \"trend\": <sentence1>,\n  \"noise\": <sentence2>,\n  \"extrema\": <sentence3> }.\n Series: [00, 01, 02, 03, 04, 04, 06, ... <rest of the series>...]
 ```
 The Mistral output is considered as the "gold" output.
 
-In the end the dataset contains 200-1000 samples, 90% of which are used for training, the ohter 10% are used for testing.
+In the end the dataset contains 200 samples, 90% of which are used for training, the ohter 10% are used for testing.
 
 We train on approximately 13 epochs and 160 steps, until the loss stops decreasing. The chosen loss is the cross-entropy loss evaluated on the test dataset.
 
@@ -158,12 +160,13 @@ From the tables, we observe that initially the small LLMs are not able to genera
 
 ### Qwen2.5-1.5B-Instruct
 
-| Step          | 0    | 20   | 40    | 60    | 80    | 100   | 120   | 140   | 160   |
-| ------------- | ---- | ---- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
-| Similarity    | 0.66 | 0.95 | 0.95  | 0.96  | 0.96  | 0.96  | 0.95  | 0.96  | 0.96  |
-| NLI "trend"   | 0.45 | 0.50 | 0.475 | 0.70  | 0.70  | 0.825 | 0.825 | 0.75  | 0.875 |
-| NLI "noise"   | 0.50 | 0.70 | 0.725 | 0.725 | 0.875 | 0.925 | 0.775 | 0.775 | 0.90  |
-| NLI "extrema" | 0.50 | 0.45 | 0.575 | 0.575 | 0.60  | 0.575 | 0.55  | 0.55  | 0.65  |
+| Step          | 0    | 20   | 40   | 60   | 80   | 100  | 120  | 140  | 160   |
+| ------------- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ----  |
+| Similarity    | 0.50 | 0.98 | 0.98 | 0.98 | 0.98 | 0.98 | 0.98 | 0.98 | 0.98  |
+| NLI "trend"   | 0.50 | xxxx | xxxx | xxxx | xxxx | xxxx | xxxx | xxxx | 0.875 |
+| NLI "noise"   | 0.50 | xxxx | xxxx | xxxx | xxxx | xxxx | xxxx | xxxx | 0.75  |
+| NLI "extrema" | 0.50 | xxxx | xxxx | xxxx | xxxx | xxxx | xxxx | xxxx | 0.875 |
+
 
 
 
@@ -171,11 +174,12 @@ From the tables, we observe that initially the small LLMs are not able to genera
 
 ### Qwen2.5-0.5B-Instruct
 
-| Step          | 0    | 20    | 40     | 60    | 80    | 100   | 120   | 140   | 160   |
-| ------------- | ---- | ----- | -----  | ----- | ----- | ----- | ----- | ----- | ----- |
-| Similarity    | 0.549 | 0.958  | 0.961  | 0.961  | 0.946  | 0.955  | 0.954  | 0.957  | 0.952 |
-| NLI "trend"   | 0.5   | 0.575 | 0.6    | 0.625  | 0.65  | 0.8  | 0.775  | 0.75  | 0.7 |
-| NLI "noise"   | 0.5   | 0.725 | 0.775  | 0.8    | 0.675  | 0.85  | 0.875  | 0.85  | 0.85 |
-| NLI "extrema" | 0.5   | 0.4   | 0.5    | 0.5    | 0.35  | 0.5  | 0.475  | 0.55  | 0.775 |
+| Step          | 0     | 20    | 40    | 60    | 80    | 100   | 120   | 140   | 160   |
+| ------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- |
+| Similarity    | 0.62  | 0.98  | xxxx  | xxxx  | 0.98  | 0.98  | 0.98  | 0.98  | 0.98  |
+| NLI "trend"   | 0.5   | 0.575 | xxxx  | xxxx  | xxxx  | 0.9   | 0.83  | 0.83  | 0.875 |
+| NLI "noise"   | 0.5   | 0.725 | xxxx  | xxxx  | xxxx  | 0.65  | 0.625 | 0.55  | 0.675 |
+| NLI "extrema" | 0.5   | 0.4   | xxxx  | xxxx  | xxxx  | 0.75  | 0.875 | 0.78  | 0.775 |
+
 
 

@@ -17,7 +17,7 @@ import logging
 from sentence_transformers import SentenceTransformer, util
 
 # === CONFIGURATION ===
-MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
+MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
 DATASET_PATH = "test_jsonl.jsonl"
 
 # Extraire le nom court du modèle
