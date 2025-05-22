@@ -74,7 +74,7 @@ print(f"Label: {label}, Score: {score}")
 import sys
 
 # true if qwen api is called
-qwenllm = False
+qwenllm = True
 # Check if a file name is provided as a command line argument
 if len(sys.argv) > 1:
     file_name = sys.argv[1]
@@ -268,19 +268,51 @@ def plot_and_save(i):
 
 # do the same but with the qwen output 
 def qwen_plot_and_save(i):
+    #category = "trend"
+    #category= "noise"
+    category = "extrema"
+
     input_data = evaluation_apres[i]['input']
     series_str = input_data.split('Series: ')[1].strip()
     series_str = re.sub(r'\b0+(\d)', r'\1', series_str)
     series = ast.literal_eval(series_str)
+
+    truth_trend, truth_noise, truth_extrema = ask_truth(series)
     #series = json.loads(input_data.split('Series: ')[1])
     #exit()
     gold_output = evaluation_apres[i]['gold_output']
+    gold_output_json = json.loads(gold_output)
+    
     # diagnostic_avant = evaluation_avant[i]['generated_output']
     # cute the string to the first 600 characters
     # diagnostic_avant = diagnostic_avant[:600]
     #diagnostic_apres = evaluation_apres[i]['generated_output']
 
     diagnostic_apres = ask_noimage(input_data)
+    if category == "trend":
+        category_question = "describe the trend (increasing/decreasing/flat) of this time series in one sentence: " + series_str
+        gold_category = truth_trend
+    elif category == "extrema":
+        category_question = "Describe the approximate localisation of global maximum (beginning/middle/end) and global minimum (beginning/middle/end) of this time series: " + series_str
+        gold_category = truth_extrema
+    elif category == "noise":
+        category_question = "Describe the noise intensity (low/medium/high) of this time series: " + series_str
+        gold_category = truth_noise
+    diagnostic_category = ask_noimage(category_question)
+    #gold_category = gold_output_json[category]
+    print("gold_category", gold_category)
+    print("diagnostic_category", diagnostic_category)
+    ac, bc = detect_contradiction_nli(diagnostic_category, gold_category)
+    print("ac", ac)
+    if ac == 'ok':
+        score_category = 1
+    elif ac == 'no':
+        score_category = 0
+    else:
+        score_category = 0.5
+    
+    print("score_category", score_category)    
+    
 
     sentence_gold = []
     sentence_after = []
@@ -349,6 +381,7 @@ def qwen_plot_and_save(i):
     fig.savefig(file_name)
     plt.close(fig)
     scores = [0 if ca == 'no' else 1 if ca == 'ok' else 0.5 for ca in cass_label_apres]
+    scores.append(score_category)
     return scores
 
 
@@ -359,16 +392,16 @@ while True:
     if user_input.lower() == 'q':
         break
     elif user_input.lower() == 'a':
-        mean_scores = [0.,0.,0.]
+        mean_scores = [0.,0.,0.,0.]
         for i in range(len(evaluation_apres)):
             if qwenllm == True:
                 scores = qwen_plot_and_save(i)
             else:
                 scores = plot_and_save(i)
             print(f"Scores for case {i}: {scores}")
-            for j in range(3):
+            for j in range(4):
                 mean_scores[j] += scores[j]
-        for j in range(3):
+        for j in range(4):
             mean_scores[j] /= len(evaluation_apres)
         print(f"Mean scores: {mean_scores}")
     else:

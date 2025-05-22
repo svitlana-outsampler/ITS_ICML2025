@@ -737,10 +737,12 @@ import re
 def ask_noimage(question):
     """Ask a question using text only (no image) via the LLM API, expecting plain text response."""
 
-    qwen_api_key = os.getenv("TEXTSYNTH_API_KEY")
-    qwen_url = "https://palgania.ovh:8106/v1/chat/completions"
-    if not qwen_api_key:
-        raise ValueError("Qwen API key not found in environment variables.")
+    # qwen_api_key = os.getenv("TEXTSYNTH_API_KEY")
+    # qwen_url = "https://palgania.ovh:8106/v1/chat/completions"
+    # if not qwen_api_key:
+    #     raise ValueError("Qwen API key not found in environment variables.")
+    qwen_api_key = ""
+    qwen_url= "http://localhost:8080/v1/chat/completions"
     
     headers = {
         "Content-Type": "application/json",
@@ -758,7 +760,7 @@ def ask_noimage(question):
                 ]
             }
         ],
-        "max_tokens": 2048,
+        "max_tokens": 512,
         # Removed "response_format"
     }
 
