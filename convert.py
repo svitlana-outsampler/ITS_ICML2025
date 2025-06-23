@@ -16,7 +16,13 @@ def convert_dataset_to_jsonl(input_path, output_path, truncate=1000):
         for item in data:
             index = item["index"]
             series = item["series"]
-            series_str = ', '.join(f"{x:02d}" for x in series)
+            # Handle case where 'series' is a list of two lists
+            if isinstance(series, list) and len(series) == 2 and all(isinstance(sub, list) for sub in series):
+                series1_str = ', '.join(f"{x:02d}" for x in series[0])
+                series2_str = ', '.join(f"{x:02d}" for x in series[1])
+                series_str = f"Series1: [{series1_str}], Series2: [{series2_str}]"
+            else:
+                series_str = ', '.join(f"{x:02d}" for x in series)
             input_text = f"{item['question']} Series: [{series_str}]"
             # write output json object in a string
             output_text = json.dumps((item["description"]))
@@ -32,4 +38,4 @@ def convert_dataset_to_jsonl(input_path, output_path, truncate=1000):
     print(f"Conversion terminée : {output_path}")
 
 # Exemple d'utilisation
-convert_dataset_to_jsonl('dataset/data.jsonl', 'test_jsonl.jsonl', truncate=200)
+convert_dataset_to_jsonl('dataset/data.jsonl', 'dataset/test_jsonl.jsonl', truncate=200)
