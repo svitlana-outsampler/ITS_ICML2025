@@ -111,11 +111,137 @@ The pictures are saved in the directory `plotdiag`.
 
 ## Using the model
 
-Conversion to `.gguf` format.
+### 1 · Convert a Hugging Face model to **GGUF**
 
-TO DO 
+> GGUF is the on‑disk format that `llama.cpp` understands. Everything else—quantisation, adapters, server—starts with having a `.gguf` file.
 
-Inference: TO DO
+#### 1.1 Prerequisites
+
+```bash
+# clone and build llama.cpp (or grab the binaries)
+git clone https://github.com/ggml-org/llama.cpp
+cd llama.cpp && make -j          # or follow the build guide for your OS
+
+# Python bits for the converter scripts
+pip install -r requirements.txt  # transformers, peft, safetensors, …
+```
+
+#### 1.2 Option A — native `llama.cpp` converters
+
+| scenario                              | command                                                                                                         |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Plain model** (float16)             | `python llama.cpp/convert_hf_to_gguf.py meta-llama/Llama-3-8b --outfile llama3‑8b‑f16.gguf --outtype f16`       |
+| **Same model, quantised to Q4\_K\_M** | `python llama.cpp/convert_hf_to_gguf.py meta-llama/Llama-3-8b --outfile llama3‑8b‑q4_K_M.gguf --outtype q4_K_M` |
+| **Convert LoRA adapter only**         | `python llama.cpp/convert_lora_to_gguf.py ./my_adapter --outfile my_adapter‑f16.gguf --outtype f16`             |
+| **Merge LoRA first**                  | 1) merge with PEFT (see below) → temp dir 2) run `convert_hf_to_gguf.py` on the merged checkpoint               |
+
+`--outtype` accepts every quantiser listed by `llama-quantize` (`f32`, `f16`, `q8_0`, `q6_K`, `q4_K_M`, `q3_K` …).  Choose the smallest type your hardware can comfortably run; Q4\_K\_M is a common sweet‑spot. ([github.com](https://github.com/ggml-org/llama.cpp/discussions/2948))
+
+##### Quick one‑liner to merge a LoRA in place
+
+```bash
+python - <<'PY'
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel
+import sys, pathlib, torch
+base, lora, out = sys.argv[1:4]
+model = AutoModelForCausalLM.from_pretrained(base, torch_dtype='auto', device_map='cpu')
+model = PeftModel.from_pretrained(model, lora)
+model = model.merge_and_unload()
+(outp:=pathlib.Path(out)).mkdir(parents=True, exist_ok=True)
+model.save_pretrained(outp, safe_serialization=True)
+AutoTokenizer.from_pretrained(base).save_pretrained(outp)
+PY  meta-llama/Llama-3-8b  ./my_adapter  ./merged
+
+python llama.cpp/convert_hf_to_gguf.py ./merged --outfile llama3‑8b‑merged‑q6_K.gguf --outtype q6_K
+```
+
+#### 1.3 Option B — all‑in‑one helper **`hf2gguf.py`**
+
+If you prefer a single entry‑point that decides whether you are converting a plain model or `base + LoRA`, use the wrapper script from the previous section:
+
+```bash
+python hf2gguf.py --base meta-llama/Llama-3-8b \
+                  --lora TheBloke/Samantha-8B-LoRA \
+                  --merge-lora \
+                  --quant q4_K_M \
+                  --outfile llama3-samantha-q4k.gguf
+```
+
+The script exposes three strategies:
+
+| strategy          | output files                 | when to pick                                          |
+| ----------------- | ---------------------------- | ----------------------------------------------------- |
+| `merge` (default) | **one** merged `.gguf`       | you only ever plan to use this adapter with this base |
+| `separate`        | `base.gguf` + `adapter.gguf` | space‑efficient; swap adapters at runtime             |
+| *plain*           | just `base.gguf`             | no adapter at all                                     |
+
+---
+
+### 2 · Running inference
+
+#### 2.1 `llama-cli` – quick tests & interactive shells
+
+```bash
+# single GGUF
+llama-cli -m llama3‑8b‑q4_K_M.gguf -p "What is 2+2?"
+
+# base + one adapter
+llama-cli -m llama3‑8b‑q4_K_M.gguf --lora Samantha‑8B‑F16.gguf \
+          -p "Translate this into pirate slang: Ahoy, friend!"
+
+# chain multiple adapters (≥ v0.2)
+llama-cli -m llama3‑8b‑q4_K_M.gguf \
+          --lora style‑pirate.gguf \
+          --lora domain‑medical.gguf \
+          -p "..."
+```
+
+The adapter flags (`--lora`, `--lora-scaled`) were added in Autumn 2024 and allow stacking or scaling per adapter.  Examples from the official discussion: ([github.com](https://github.com/ggml-org/llama.cpp/discussions/10123))
+
+#### 2.2 `llama-server` – OpenAI‑compatible REST endpoint
+
+```bash
+# one liner
+llama-server -m llama3‑8b‑q4_K_M.gguf --lora Samantha‑8B‑F16.gguf
+```
+
+* Repeat `--lora` for each adapter you want pre‑loaded.
+* Use `--lora-init-without-apply` to start the server with adapters loaded but not yet active; apply/remove them on‑the‑fly via the `POST /lora-adapters` API (hot‑reload). ([github.com](https://github.com/ggml-org/llama.cpp/discussions/10123))
+
+#### 2.3 `llama-run` – minimal one‑shot runner
+
+`llama-run` is a tiny wrapper useful for scripting and CI pipelines:
+
+```bash
+llama-run -m llama3‑8b‑q4_K_M.gguf -p "Write a haiku about frogs" -n 128
+```
+
+The utility behaves like `llama-cli` but prints only the generated text, making it easy to pipe into other tools. ([github.com](https://github.com/ggml-org/llama.cpp?utm_source=chatgpt.com))
+
+---
+
+### 3 · Managing **multiple GGUFs**
+
+| approach                      |  pros                                                    | cons                                                                  | typical command                                              |
+| ----------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Merged** (single file)      | everything in one place; works with every client         | larger file; can’t swap adapters                                      | *convert via `--merge-lora` then* `llama-cli -m merged.gguf` |
+| **Separate** (base + adapter) | tiny adapters; combine freely; hot‑reload in server mode | each run needs extra `--lora` flags; adapter quantisation must ≤ base | `llama-cli -m base.q4_K_M.gguf --lora my_adapter.f16.gguf`   |
+
+> **Tip :** The adapter’s quantisation **does not need to match** the base, but it must not be *higher* precision than the base (e.g. F16 adapter on Q4 base is fine; Q4 adapter on F16 base will degrade quality).
+
+---
+
+### 4 · Troubleshooting cheatsheet
+
+* **“not enough VRAM”** → choose a smaller `--outtype` (`q4_K_M` instead of `q6_K`, `q3_K_S` instead of `q4_K_M`).
+* **Tokenizer mismatch** after merging LoRA → always export the tokenizer from the *base*, not the adapter.
+* **Slow first token** on GPU → pass `--gpu-layers N` where *N* fits your VRAM; leaving everything on CPU is often faster than partial GPU offload on weak cards.
+
+---
+
+Refer to the [llama.cpp README](https://github.com/ggml-org/llama.cpp) for the full list of runtime flags—context window (`-c`), sampling parameters, hardware back‑ends, and more. ([github.com](https://github.com/ggml-org/llama.cpp))
+
 
 ## Results
 
@@ -180,6 +306,3 @@ From the tables, we observe that initially the small LLMs are not able to genera
 | NLI "trend"   | 0.5   | 0.575 | xxxx  | xxxx  | xxxx  | 0.9   | 0.83  | 0.83  | 0.875 |
 | NLI "noise"   | 0.5   | 0.725 | xxxx  | xxxx  | xxxx  | 0.65  | 0.625 | 0.55  | 0.675 |
 | NLI "extrema" | 0.5   | 0.4   | xxxx  | xxxx  | xxxx  | 0.75  | 0.875 | 0.78  | 0.775 |
-
-
-
