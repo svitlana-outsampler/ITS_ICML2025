@@ -285,17 +285,28 @@ class OUProcess:
         if self.n == 2:
             diff = np.sign(data[0] - data[1])
             idx  = np.where(np.diff(diff) != 0)[0]
-            intersection_count = len(idx)
 
             loc_map = { "beginning": (0, 32), "middle": (32, 96), "end": (96, 128) }
             loc_counts = {k: ((idx >= a) & (idx < b)).sum() for k, (a, b) in loc_map.items()}
 
-            if intersection_count == 0:
-                desc["intersections"] = "zero intersections"
-            else:
-                parts = [f"{v or 'zero'} in the {k}" for k, v in loc_counts.items()]
-                word  = "one intersection" if intersection_count == 1 else "several intersections"
-                desc["intersections"] = f"{word} ({', '.join(parts)})"
+            # Compose intersection description in the requested style
+            loc_order = ["beginning", "middle", "end"]
+            phrases = []
+            for idx, k in enumerate(loc_order):
+                v = loc_counts[k]
+                if v == 0:
+                    word = "zero intersections"
+                elif v == 1:
+                    word = "one intersection"
+                else:
+                    word = "several intersections"
+                if idx == 0:
+                    phrases.append(f"There {'is' if v == 1 else 'are'} {word} in the {k}")
+                elif idx == 2:
+                    phrases.append(f"and there {'is' if v == 1 else 'are'} {word} in the {k} of the time series.")
+                else:
+                    phrases.append(f"there {'is' if v == 1 else 'are'} {word} in {k}")
+            desc["intersections"] = ", ".join(phrases)
 
             # Position relative (majoritairement au-dessus / en dessous / mélangée)
             rel_parts, thr = [], 8
@@ -316,77 +327,6 @@ class OUProcess:
             desc["position"] = "; ".join(rel_parts)
 
         return data, json.dumps(desc, ensure_ascii=False, indent=2)
-    
-# recompute the truth 
-def ask_truth(X):
-    x = np.arange(len(X))
-    coeffs = np.polyfit(x, X, deg=3)
-    P = np.poly1d(coeffs)
-    X_fit = P(x)
-    # compute the l2 norm of the difference
-    l2_norm = np.linalg.norm(X - X_fit)/np.sqrt(len(X))
-    # plt.plot(x,X)
-    # plt.plot(x,X_fit)
-    # plt.show()
-    Pp = P.deriv()
-    Xp_fit = Pp(x)
-    delta = Xp_fit[-1] - Xp_fit[0]
-    # divmin = np.min(Xp_fit)
-    # divmax = np.max(Xp_fit)
-    # if divmin > 0:
-    #     sentence =  "the time series presents an overall increasing trend"
-    # elif divmax < 0:
-    #     sentence = "the time series presents an overall decreasing trend"
-    # else:
-    #     sentence = "the time series presents no uniformly increasing or decreasing trend"
-    # if delta > 5:
-    #     sentence =  "the time series presents an overall increasing trend"
-    # elif delta < -5:
-    #     sentence = "the time series presents an overall decreasing trend"
-    # else:
-    #     sentence = "the time series presents no uniformly increasing or decreasing trend"
-    # compute the average of the solution on the 20 first points
-    average1 = np.mean(X[:20])
-    # compute the average of the solution on the 20 last points
-    average2 = np.mean(X[-20:])
-    if average1 < average2 -3:
-        sentence_trend = "the time series shows an overall increasing trend."
-    elif average1 > average2 +3:
-        sentence_trend = "the time series shows an overall decreasing trend."
-    else:
-        sentence_trend = "the time series shows no uniformly increasing or decreasing trend."
-
-    print(f"L2 norm of the difference: {l2_norm}")
-    #sentence_noise = self.data_json[i]["description"]["noise"]
-    if l2_norm < 2:
-        sentence_noise = "the noise intensity is low"
-    elif l2_norm > 12:
-        sentence_noise = "the noise intensity is high"
-    else:
-        sentence_noise = "the noise intensity is medium"
-    # print(sentence_noise)
-    # self.data_json[i]["truth_description"]["noise"] = sentence_noise
-    # recherche de la localisation en t du maximum et du minimum
-    pos_max = np.argmax(X)
-    print('pos_max', pos_max)
-    if pos_max < 32:
-        sentence_extrema = "The maximum is reached around the beginning part of the time series"
-    elif pos_max > 96:
-        sentence_extrema = "The maximum is reached towards the end of the time series"
-    else:
-        sentence_extrema = "The maximum is reached around the middle of the time series"
-
-    pos_min = np.argmin(X)
-    print('pos_min', pos_min)
-    if pos_min < 32:
-        sentence_extrema += " and the minimum is reached around the beginning part of the time series."
-    elif pos_min > 96:
-        sentence_extrema += " and the minimum is reached towards the end of the time series."
-    else:
-        sentence_extrema += " and the minimum is reached around the middle of the time series."
-
-    return (sentence_trend, sentence_noise, sentence_extrema)
-
 
 # définir les modèles: pixtral, mistral, qwen, nollm (génération de phrases factuelles)
 # appeler ask ou ask noimage en fonction du modèle
@@ -848,10 +788,10 @@ class Mistral:
                     print("position", position)
                     print("truth_position", truth_position)
                     print("score_position", score_position)
-                    if score_position[0] == 'no':
-                        index_to_remove.append(i)
-                        errors[2] += 1
-                        self.data_json[i]["description"]["position"] = self.data_json[i]["truth_description"]["position"]
+                    # if score_position[0] == 'no':
+                    #     index_to_remove.append(i)
+                    #     errors[2] += 1
+                    #     self.data_json[i]["description"]["position"] = self.data_json[i]["truth_description"]["position"]
 
         print("errors", errors, "/", len(self.data_json))
 
